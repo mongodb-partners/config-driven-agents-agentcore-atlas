@@ -1,0 +1,176 @@
+[
+  {
+    "companyId": "co-acme-robotics",
+    "name": "Acme Robotics",
+    "industry": "Robotics / Warehouse automation",
+    "size": "450",
+    "stage": "Series C",
+    "founded": 2016,
+    "headquarters": "London, UK",
+    "funding": { "totalRaisedUsd": 180000000, "lastRound": "Series C", "lastRoundYear": 2025 },
+    "techStack": ["python", "pytorch", "ros2", "kubernetes", "mongodb", "aws"],
+    "engineeringPractices": [
+      "Trunk-based development, roughly 20 deploys a day",
+      "One-week on-call rotation, engineers own their services in production",
+      "Design docs circulate for 48h before any cross-team change"
+    ],
+    "culture": [
+      "Written-first — proposals go out as documents before meetings happen",
+      "Hardware release cycles create genuine crunch in the weeks before customer pilots",
+      "Strong internal mobility; several ML engineers started on the backend team"
+    ],
+    "benefits": ["private health", "learning budget GBP 2,000/yr", "hybrid, 3 days on-site"],
+    "sentiment": {
+      "score": 3.9, "reviewCount": 212, "asOf": "2026-03-01",
+      "themes": {
+        "positive": ["genuinely hard technical problems", "strong mentorship from staff engineers"],
+        "negative": ["compensation lags the London market by 10-15%", "pre-launch crunch is real and recurring"]
+      }
+    }
+  },
+  {
+    "companyId": "co-northwind-health",
+    "name": "Northwind Health",
+    "industry": "Healthcare / Clinical data platforms",
+    "size": "1200",
+    "stage": "public",
+    "founded": 2009,
+    "headquarters": "Boston, MA, USA",
+    "funding": { "totalRaisedUsd": 0, "lastRound": "IPO", "lastRoundYear": 2021 },
+    "techStack": ["java", "typescript", "postgres", "kafka", "aws", "terraform"],
+    "engineeringPractices": [
+      "Two-week sprints with a formal release train",
+      "Every change touching patient data needs a second reviewer and an audit entry",
+      "Heavy automated compliance testing; CI runs about 40 minutes"
+    ],
+    "culture": [
+      "Process-heavy by necessity — regulated environment, and it shows in the pace",
+      "Excellent work-life balance; on-call is rare and genuinely compensated",
+      "Slower to adopt new technology than most engineers coming from startups expect"
+    ],
+    "benefits": ["full medical/dental/vision", "401k 6% match", "fully remote in the US", "20 weeks parental leave"],
+    "sentiment": {
+      "score": 4.1, "reviewCount": 890, "asOf": "2026-02-15",
+      "themes": {
+        "positive": ["stability and predictable hours", "meaningful mission", "best-in-class parental leave"],
+        "negative": ["career progression is slow", "legacy Java services nobody wants to own", "many layers of approval"]
+      }
+    }
+  },
+  {
+    "companyId": "co-lumen-fintech",
+    "name": "Lumen Fintech",
+    "industry": "Fintech / Payments infrastructure",
+    "size": "180",
+    "stage": "Series B",
+    "founded": 2020,
+    "headquarters": "Berlin, Germany",
+    "funding": { "totalRaisedUsd": 62000000, "lastRound": "Series B", "lastRoundYear": 2025 },
+    "techStack": ["go", "typescript", "postgres", "mongodb", "kubernetes", "gcp"],
+    "engineeringPractices": [
+      "Small autonomous squads, each owning a payment rail end to end",
+      "No dedicated QA — engineers write and own their tests",
+      "Incident reviews are blameless and published company-wide"
+    ],
+    "culture": [
+      "High autonomy, high expectation — very little direction is given, which suits some people and not others",
+      "English-first office, roughly 30 nationalities",
+      "Growing fast enough that roles change under you every few months"
+    ],
+    "benefits": ["remote within EU", "EUR 1,500 home office budget", "German public health top-up", "equity for all engineers"],
+    "sentiment": {
+      "score": 4.0, "reviewCount": 96, "asOf": "2026-01-20",
+      "themes": {
+        "positive": ["real ownership from week one", "fast decisions", "competitive equity"],
+        "negative": ["onboarding is thin, expect to self-serve", "priorities shift often", "limited senior mentorship"]
+      }
+    }
+  },
+  {
+    "companyId": "co-tessellate-ai",
+    "name": "Tessellate AI",
+    "industry": "AI / Developer tooling",
+    "size": "75",
+    "stage": "Series A",
+    "founded": 2023,
+    "headquarters": "San Francisco, CA, USA",
+    "funding": { "totalRaisedUsd": 28000000, "lastRound": "Series A", "lastRoundYear": 2026 },
+    "techStack": ["python", "pytorch", "rust", "mongodb", "aws", "vector search"],
+    "engineeringPractices": [
+      "Ship-to-main daily; feature flags over long-lived branches",
+      "Research and product engineers sit in the same team, no handoff",
+      "Model evaluations gate every release"
+    ],
+    "culture": [
+      "Intense pace — the company is explicit that this is not a balanced-hours environment",
+      "Flat structure, founders still review code",
+      "In-office four days a week in SF, no remote option for engineers"
+    ],
+    "benefits": ["top-of-market base", "meaningful early equity", "daily catered lunch", "unlimited PTO (rarely taken)"],
+    "sentiment": {
+      "score": 3.6, "reviewCount": 41, "asOf": "2026-04-01",
+      "themes": {
+        "positive": ["frontier work with real users", "enormous scope for the level", "excellent compensation"],
+        "negative": ["burnout is common and openly acknowledged", "no remote flexibility", "processes barely exist"]
+      }
+    }
+  },
+  {
+    "companyId": "co-harbour-logistics",
+    "name": "Harbour Logistics",
+    "industry": "Logistics / Supply chain software",
+    "size": "600",
+    "stage": "bootstrapped",
+    "founded": 2011,
+    "headquarters": "Rotterdam, Netherlands",
+    "funding": { "totalRaisedUsd": 0, "lastRound": "none", "lastRoundYear": 0 },
+    "techStack": ["java", "python", "postgres", "mongodb", "azure", "kubernetes"],
+    "engineeringPractices": [
+      "Profitable and unhurried — quarterly planning, no crunch culture",
+      "Strong internal platform team; product engineers rarely touch infrastructure",
+      "Pairing is the default for anything non-trivial"
+    ],
+    "culture": [
+      "Genuinely 40-hour weeks, and management enforces it",
+      "Long tenure — the median engineer has been there over five years",
+      "Conservative technology choices; expect to work on systems, not greenfield"
+    ],
+    "benefits": ["32-hour week option at 80% pay", "hybrid, 2 days on-site", "profit share", "pension 8%"],
+    "sentiment": {
+      "score": 4.3, "reviewCount": 305, "asOf": "2026-02-01",
+      "themes": {
+        "positive": ["best work-life balance in the industry", "no layoffs in 14 years", "supportive management"],
+        "negative": ["compensation below market for senior levels", "little exposure to modern tooling", "slow promotion cycles"]
+      }
+    }
+  },
+  {
+    "companyId": "co-vertex-media",
+    "name": "Vertex Media",
+    "industry": "Media / Streaming",
+    "size": "2400",
+    "stage": "public",
+    "founded": 2004,
+    "headquarters": "New York, NY, USA",
+    "funding": { "totalRaisedUsd": 0, "lastRound": "IPO", "lastRoundYear": 2014 },
+    "techStack": ["typescript", "react", "go", "cassandra", "mongodb", "aws"],
+    "engineeringPractices": [
+      "Service-per-team ownership with a strong SRE function",
+      "Rigorous A/B testing culture — most features ship behind an experiment",
+      "Quarterly architecture review board for cross-cutting changes"
+    ],
+    "culture": [
+      "Scale problems are real and interesting; organisational politics are also real",
+      "Very strong for frontend and streaming-infrastructure careers specifically",
+      "Team quality varies widely — the interview is as much you assessing them"
+    ],
+    "benefits": ["health/dental/vision", "401k 5% match", "hybrid, 3 days on-site", "annual RSU refresh"],
+    "sentiment": {
+      "score": 3.7, "reviewCount": 1420, "asOf": "2026-03-10",
+      "themes": {
+        "positive": ["excellent compensation", "genuinely large-scale systems", "strong brand on a CV"],
+        "negative": ["team experience is a lottery", "reorgs roughly annually", "promotion depends heavily on your manager"]
+      }
+    }
+  }
+]

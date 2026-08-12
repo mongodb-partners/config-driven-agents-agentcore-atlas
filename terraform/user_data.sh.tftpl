@@ -1,0 +1,78 @@
+#!/bin/bash
+# Boot the workshop box: fetch the app bundle, seed Atlas, serve the UI.
+#
+# Seeding runs before Streamlit starts, so "the UI is up" means "the data is
+# ready". Progress: /var/log/riv-seed.log  ·  App: /var/log/riv-ui.log
+set -euxo pipefail
+exec > >(tee -a /var/log/riv-bootstrap.log) 2>&1
+
+# AL2023 ships the AWS CLI v2 already; installing it again would abort under set -e.
+dnf install -y python3.11 python3.11-pip unzip
+
+install -d -o ec2-user -g ec2-user /opt/riv
+aws s3 cp "${bundle_uri}" /tmp/bundle.zip --region ${region}
+unzip -oq /tmp/bundle.zip -d /opt/riv
+chown -R ec2-user:ec2-user /opt/riv
+
+cat > /etc/riv-workshop.env <<'ENVEOF'
+AWS_REGION=${region}
+AWS_DEFAULT_REGION=${region}
+ORCHESTRATOR_RUNTIME_ARN=${orchestrator_arn}
+AGENT_LOG_GROUP=${orchestrator_log_group}
+MONGODB_DB=${mongodb_db}
+MONGODB_URI_SECRET_ARN=${mongodb_secret_arn}
+WORKSHOP_USER_ID=workshop-user
+VOYAGE_API_KEY=${voyage_api_key}
+VOYAGE_EMBED_MODEL=${voyage_embed_model}
+ENVEOF
+chmod 0644 /etc/riv-workshop.env
+
+python3.11 -m venv /opt/riv/venv
+/opt/riv/venv/bin/pip install --quiet --upgrade pip
+/opt/riv/venv/bin/pip install --quiet -r /opt/riv/seed/requirements.txt -r /opt/riv/ui/requirements.txt
+
+# ── Seed Atlas ────────────────────────────────────────────────────────────────
+set +x # keep the connection string out of the log
+MONGODB_URI="$(aws secretsmanager get-secret-value \
+  --secret-id "${mongodb_secret_arn}" --region ${region} \
+  --query SecretString --output text)"
+export MONGODB_URI
+set -x
+
+set -o allexport; . /etc/riv-workshop.env; set +o allexport
+
+if /opt/riv/venv/bin/python /opt/riv/seed/seed.py 2>&1 | tee /var/log/riv-seed.log; then
+  echo "seed: ok"
+else
+  echo "seed: FAILED — see /var/log/riv-seed.log. Re-run with:" >&2
+  echo "  sudo -i; export MONGODB_URI=...; /opt/riv/venv/bin/python /opt/riv/seed/seed.py" >&2
+fi
+
+# ── Serve the UI ──────────────────────────────────────────────────────────────
+cat > /etc/systemd/system/riv-ui.service <<'SVCEOF'
+[Unit]
+Description=Multi-agent RIV workshop UI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ec2-user
+WorkingDirectory=/opt/riv/ui
+EnvironmentFile=/etc/riv-workshop.env
+ExecStart=/opt/riv/venv/bin/streamlit run app.py \
+  --server.port 8501 \
+  --server.address 0.0.0.0 \
+  --server.headless true \
+  --browser.gatherUsageStats false
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/riv-ui.log
+StandardError=append:/var/log/riv-ui.log
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+systemctl daemon-reload
+systemctl enable --now riv-ui.service
+echo "bootstrap: complete"

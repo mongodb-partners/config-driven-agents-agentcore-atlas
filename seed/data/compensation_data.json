@@ -1,0 +1,82 @@
+[
+  {
+    "benchmarkId": "comp-ml-engineer-mid-london",
+    "role": "Machine Learning Engineer", "seniority": "mid", "location": "London, UK", "currency": "GBP",
+    "base": { "p25": 68000, "p50": 78000, "p75": 90000 },
+    "total": { "p25": 72000, "p50": 86000, "p75": 102000 },
+    "benefits": ["private health", "pension 5% match", "GBP 2,000 learning budget", "hybrid working"],
+    "sampleSize": 168, "asOf": "2026-01-01"
+  },
+  {
+    "benchmarkId": "comp-ml-engineer-senior-london",
+    "role": "Machine Learning Engineer", "seniority": "senior", "location": "London, UK", "currency": "GBP",
+    "base": { "p25": 88000, "p50": 102000, "p75": 120000 },
+    "total": { "p25": 96000, "p50": 118000, "p75": 145000 },
+    "benefits": ["private health", "pension 6% match", "equity refresh", "conference budget"],
+    "sampleSize": 142, "asOf": "2026-01-01"
+  },
+  {
+    "benchmarkId": "comp-ml-engineer-senior-sf",
+    "role": "Machine Learning Engineer", "seniority": "senior", "location": "San Francisco, CA, USA", "currency": "USD",
+    "base": { "p25": 195000, "p50": 225000, "p75": 260000 },
+    "total": { "p25": 285000, "p50": 360000, "p75": 470000 },
+    "benefits": ["full medical/dental/vision", "401k 4% match", "annual RSU refresh", "catered meals"],
+    "sampleSize": 310, "asOf": "2026-02-01"
+  },
+  {
+    "benchmarkId": "comp-backend-engineer-mid-london",
+    "role": "Backend Engineer", "seniority": "mid", "location": "London, UK", "currency": "GBP",
+    "base": { "p25": 60000, "p50": 70000, "p75": 80000 },
+    "total": { "p25": 63000, "p50": 75000, "p75": 88000 },
+    "benefits": ["private health", "pension 5% match", "hybrid working"],
+    "sampleSize": 420, "asOf": "2026-01-01"
+  },
+  {
+    "benchmarkId": "comp-backend-engineer-senior-london",
+    "role": "Senior Backend Engineer", "seniority": "senior", "location": "London, UK", "currency": "GBP",
+    "base": { "p25": 82000, "p50": 95000, "p75": 110000 },
+    "total": { "p25": 88000, "p50": 106000, "p75": 128000 },
+    "benefits": ["private health", "pension 6% match", "equity", "GBP 2,000 learning budget"],
+    "sampleSize": 356, "asOf": "2026-01-01"
+  },
+  {
+    "benchmarkId": "comp-backend-engineer-mid-berlin",
+    "role": "Backend Engineer", "seniority": "mid", "location": "Berlin, Germany", "currency": "EUR",
+    "base": { "p25": 65000, "p50": 74000, "p75": 85000 },
+    "total": { "p25": 68000, "p50": 80000, "p75": 95000 },
+    "benefits": ["public health top-up", "EUR 1,500 home office budget", "remote within EU", "equity"],
+    "sampleSize": 188, "asOf": "2026-02-01"
+  },
+  {
+    "benchmarkId": "comp-platform-engineer-mid-us-remote",
+    "role": "Platform Engineer", "seniority": "mid", "location": "United States (remote)", "currency": "USD",
+    "base": { "p25": 135000, "p50": 155000, "p75": 178000 },
+    "total": { "p25": 145000, "p50": 172000, "p75": 205000 },
+    "benefits": ["full medical/dental/vision", "401k 6% match", "fully remote", "home office stipend"],
+    "sampleSize": 274, "asOf": "2026-02-15"
+  },
+  {
+    "benchmarkId": "comp-data-engineer-senior-us-remote",
+    "role": "Data Engineer", "seniority": "senior", "location": "United States (remote)", "currency": "USD",
+    "base": { "p25": 160000, "p50": 182000, "p75": 208000 },
+    "total": { "p25": 172000, "p50": 200000, "p75": 240000 },
+    "benefits": ["full medical/dental/vision", "401k 6% match", "fully remote", "20 weeks parental leave"],
+    "sampleSize": 196, "asOf": "2026-02-15"
+  },
+  {
+    "benchmarkId": "comp-fullstack-engineer-mid-netherlands",
+    "role": "Full-Stack Engineer", "seniority": "mid", "location": "Rotterdam, Netherlands", "currency": "EUR",
+    "base": { "p25": 58000, "p50": 66000, "p75": 75000 },
+    "total": { "p25": 61000, "p50": 71000, "p75": 82000 },
+    "benefits": ["pension 8%", "profit share", "32-hour week option", "hybrid working"],
+    "sampleSize": 134, "asOf": "2026-01-15"
+  },
+  {
+    "benchmarkId": "comp-engineering-manager-staff-nyc",
+    "role": "Engineering Manager", "seniority": "staff", "location": "New York, NY, USA", "currency": "USD",
+    "base": { "p25": 205000, "p50": 235000, "p75": 268000 },
+    "total": { "p25": 270000, "p50": 325000, "p75": 400000 },
+    "benefits": ["full medical/dental/vision", "401k 5% match", "annual RSU refresh", "hybrid working"],
+    "sampleSize": 148, "asOf": "2026-03-01"
+  }
+]

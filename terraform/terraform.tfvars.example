@@ -1,0 +1,32 @@
+# Copy to terraform.tfvars and fill in. That file is gitignored — it holds secrets.
+
+# ── Required: MongoDB Atlas ───────────────────────────────────────────────────
+# Atlas → Organization → Access Manager → API Keys.
+# The key needs the "Organization Project Creator" role.
+atlas_org_id      = "REPLACE_ME"
+atlas_public_key  = "REPLACE_ME"
+atlas_private_key = "REPLACE_ME"
+
+# ── Optional ──────────────────────────────────────────────────────────────────
+
+# Must have Bedrock AgentCore plus Claude Haiku 4.5 and Titan Embed v2 enabled.
+aws_region   = "us-east-1"
+atlas_region = "US_EAST_1"
+
+# Prefixes every resource. Keep it short — it becomes part of runtime names.
+project_name = "riv-workshop"
+
+# M10 is the default because the free M0 tier allows only three Atlas Search
+# indexes and this stack needs seven. Roughly USD 0.11/hour — destroy when done.
+atlas_cluster_tier = "M10"
+
+# Leave empty to embed with Bedrock Titan (no extra account needed).
+# Set it to use Voyage AI instead — both are 1024-dim, so nothing else changes.
+voyage_api_key = ""
+
+# Only used when voyage_api_key is set. voyage-4 is the current generation.
+# Alternatives: voyage-4-lite, voyage-4-large, voyage-3.5, voyage-3-large, voyage-3.
+voyage_embed_model = "voyage-4"
+
+# Narrow this to your own IP/32 if your network allows it.
+ui_allowed_cidr = "0.0.0.0/0"

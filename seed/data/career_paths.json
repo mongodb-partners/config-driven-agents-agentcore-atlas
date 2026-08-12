@@ -1,0 +1,90 @@
+[
+  {
+    "pathId": "path-backend-to-ml-engineer",
+    "targetRole": "Machine Learning Engineer",
+    "fromRoles": ["Backend Engineer", "Full-Stack Engineer", "Data Engineer"],
+    "seniority": "mid",
+    "description": "Moving from backend into ML engineering. The engineering half transfers almost entirely — what you are actually acquiring is modelling judgement and the discipline of honest evaluation. Most people underestimate the evaluation part and over-invest in model architectures.",
+    "requiredSkills": [
+      { "skillId": "skill-python", "name": "python", "importance": "core", "note": "You likely have this already; the ML ecosystem assumes fluency" },
+      { "skillId": "skill-machine-learning", "name": "machine learning", "importance": "core", "note": "Framing, features, and evaluation matter more than architectures" },
+      { "skillId": "skill-pytorch", "name": "pytorch", "importance": "important", "note": "The training framework you will be expected to know" },
+      { "skillId": "skill-vector-search", "name": "vector search", "importance": "nice", "note": "Increasingly assumed for retrieval and RAG work" }
+    ],
+    "milestones": [
+      { "order": 1, "title": "Foundations — ML fundamentals and honest evaluation", "skills": ["skill-machine-learning"], "estimatedWeeks": 8 },
+      { "order": 2, "title": "Applied modelling with PyTorch", "skills": ["skill-pytorch"], "estimatedWeeks": 6 },
+      { "order": 3, "title": "Production ML — serving, monitoring, and retrieval", "skills": ["skill-vector-search", "skill-python"], "estimatedWeeks": 5 }
+    ]
+  },
+  {
+    "pathId": "path-mid-to-senior-backend",
+    "targetRole": "Senior Backend Engineer",
+    "fromRoles": ["Backend Engineer", "Full-Stack Engineer"],
+    "seniority": "senior",
+    "description": "The mid-to-senior step is not about writing more code. It is about owning ambiguous problems end to end, making trade-offs you can defend in writing, and being someone other engineers' work depends on. Most people who stall here are technically ready and have not built the ownership record.",
+    "requiredSkills": [
+      { "skillId": "skill-system-design", "name": "system design", "importance": "core", "note": "The single biggest differentiator at this step" },
+      { "skillId": "skill-postgres", "name": "postgres", "importance": "important", "note": "Deep knowledge of at least one datastore is expected" },
+      { "skillId": "skill-kubernetes", "name": "kubernetes", "importance": "important", "note": "Seniors are expected to debug their own production" },
+      { "skillId": "skill-leadership", "name": "technical leadership", "importance": "nice", "note": "Mentoring and design review, not management" }
+    ],
+    "milestones": [
+      { "order": 1, "title": "Depth — master the datastore and runtime you already use", "skills": ["skill-postgres", "skill-kubernetes"], "estimatedWeeks": 8 },
+      { "order": 2, "title": "Design — write and defend three real design documents", "skills": ["skill-system-design"], "estimatedWeeks": 10 },
+      { "order": 3, "title": "Ownership — lead one cross-team project end to end", "skills": ["skill-leadership"], "estimatedWeeks": 12 }
+    ]
+  },
+  {
+    "pathId": "path-ic-to-engineering-manager",
+    "targetRole": "Engineering Manager",
+    "fromRoles": ["Senior Backend Engineer", "Staff Engineer", "Tech Lead"],
+    "seniority": "staff",
+    "description": "The IC-to-manager move is a change of profession, not a promotion. Your output becomes your team's output, and the feedback loop lengthens from hours to quarters. The people who do this well usually trialled it as a tech lead first — and a meaningful number go back to IC, which is a normal outcome and not a failure.",
+    "requiredSkills": [
+      { "skillId": "skill-leadership", "name": "technical leadership", "importance": "core", "note": "Start before the title: lead projects, mentor, run reviews" },
+      { "skillId": "skill-system-design", "name": "system design", "importance": "core", "note": "You stop building but must still hold the architecture" }
+    ],
+    "milestones": [
+      { "order": 1, "title": "Tech lead trial — own a project's direction, not its code", "skills": ["skill-leadership"], "estimatedWeeks": 16 },
+      { "order": 2, "title": "People practice — mentor two engineers, run hiring loops, give hard feedback", "skills": ["skill-leadership"], "estimatedWeeks": 12 },
+      { "order": 3, "title": "Architecture stewardship — hold the design bar without writing the code", "skills": ["skill-system-design"], "estimatedWeeks": 10 }
+    ]
+  },
+  {
+    "pathId": "path-frontend-to-fullstack",
+    "targetRole": "Full-Stack Engineer",
+    "fromRoles": ["Frontend Engineer", "UI Engineer"],
+    "seniority": "mid",
+    "description": "Frontend to full-stack is mostly about becoming genuinely comfortable with data and its failure modes. The language rarely blocks people; schema design, transactions, and what happens when the network is unreliable are what do.",
+    "requiredSkills": [
+      { "skillId": "skill-typescript", "name": "typescript", "importance": "core", "note": "You have this; it carries straight to the server" },
+      { "skillId": "skill-postgres", "name": "postgres", "importance": "core", "note": "Schema design and transactions are the real gap" },
+      { "skillId": "skill-system-design", "name": "system design", "importance": "important", "note": "API boundaries and failure handling" },
+      { "skillId": "skill-docker", "name": "docker", "importance": "nice", "note": "Enough to run and debug your own stack" }
+    ],
+    "milestones": [
+      { "order": 1, "title": "Data foundations — schema design, indexes, transactions", "skills": ["skill-postgres"], "estimatedWeeks": 6 },
+      { "order": 2, "title": "Server-side TypeScript and API design", "skills": ["skill-typescript", "skill-system-design"], "estimatedWeeks": 6 },
+      { "order": 3, "title": "Ship and operate one service you wrote yourself", "skills": ["skill-docker"], "estimatedWeeks": 4 }
+    ]
+  },
+  {
+    "pathId": "path-backend-to-platform",
+    "targetRole": "Platform Engineer",
+    "fromRoles": ["Backend Engineer", "DevOps Engineer", "SRE"],
+    "seniority": "mid",
+    "description": "Platform engineering is product engineering where your users are other engineers. The technical skills are learnable in months; the harder shift is treating internal tooling as a product with users who can and will route around you.",
+    "requiredSkills": [
+      { "skillId": "skill-terraform", "name": "terraform", "importance": "core", "note": "Module design and state management, not just resource blocks" },
+      { "skillId": "skill-aws", "name": "aws", "importance": "core", "note": "IAM is the part that actually takes time" },
+      { "skillId": "skill-kubernetes", "name": "kubernetes", "importance": "important", "note": "Expected as the substrate almost everywhere" },
+      { "skillId": "skill-go", "name": "go", "importance": "nice", "note": "Most platform tooling you will extend is written in it" }
+    ],
+    "milestones": [
+      { "order": 1, "title": "Infrastructure as code, properly — modules and state", "skills": ["skill-terraform"], "estimatedWeeks": 6 },
+      { "order": 2, "title": "Cloud depth, with IAM as the main event", "skills": ["skill-aws"], "estimatedWeeks": 8 },
+      { "order": 3, "title": "Operate the substrate — run and debug a real cluster", "skills": ["skill-kubernetes", "skill-go"], "estimatedWeeks": 8 }
+    ]
+  }
+]

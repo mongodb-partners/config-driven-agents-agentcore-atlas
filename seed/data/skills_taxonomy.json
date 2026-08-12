@@ -1,0 +1,138 @@
+[
+  {
+    "skillId": "skill-python", "name": "python", "category": "language",
+    "description": "General-purpose language, dominant across ML, data engineering, and backend services.",
+    "relatedSkills": ["skill-machine-learning", "skill-pytorch"],
+    "learningResources": [
+      { "title": "Fluent Python, 2nd ed.", "type": "book", "estimatedHours": 40 },
+      { "title": "Build a typed REST service with FastAPI and full test coverage", "type": "project", "estimatedHours": 20 }
+    ]
+  },
+  {
+    "skillId": "skill-machine-learning", "name": "machine learning", "category": "domain",
+    "description": "Supervised and unsupervised fundamentals: framing, features, training, and honest evaluation.",
+    "relatedSkills": ["skill-python", "skill-pytorch"],
+    "learningResources": [
+      { "title": "Hands-On Machine Learning, 3rd ed.", "type": "book", "estimatedHours": 60 },
+      { "title": "Reproduce a published benchmark result end to end and document where you diverged", "type": "project", "estimatedHours": 35 }
+    ]
+  },
+  {
+    "skillId": "skill-pytorch", "name": "pytorch", "category": "framework",
+    "description": "Model training and inference framework; the default in research and increasingly in production.",
+    "relatedSkills": ["skill-machine-learning", "skill-python"],
+    "learningResources": [
+      { "title": "PyTorch official tutorials", "type": "docs", "estimatedHours": 15 },
+      { "title": "Train and serve an image classifier, then profile and halve its inference latency", "type": "project", "estimatedHours": 25 }
+    ]
+  },
+  {
+    "skillId": "skill-vector-search", "name": "vector search", "category": "domain",
+    "description": "Embedding-based retrieval: index design, ANN trade-offs, filtering, and measuring recall honestly.",
+    "relatedSkills": ["skill-machine-learning", "skill-mongodb"],
+    "learningResources": [
+      { "title": "MongoDB Atlas Vector Search documentation", "type": "docs", "estimatedHours": 8 },
+      { "title": "Build a RAG pipeline and measure recall@k against a hand-labelled set", "type": "project", "estimatedHours": 20 }
+    ]
+  },
+  {
+    "skillId": "skill-mongodb", "name": "mongodb", "category": "database",
+    "description": "Document database; schema design, aggregation pipelines, indexing, and Atlas Search.",
+    "relatedSkills": ["skill-vector-search", "skill-system-design"],
+    "learningResources": [
+      { "title": "MongoDB University: Data Modeling", "type": "course", "estimatedHours": 12 },
+      { "title": "Model a real domain twice — embedded and referenced — and benchmark both", "type": "project", "estimatedHours": 15 }
+    ]
+  },
+  {
+    "skillId": "skill-postgres", "name": "postgres", "category": "database",
+    "description": "Relational database; query planning, indexing strategy, transactions, and isolation levels.",
+    "relatedSkills": ["skill-system-design"],
+    "learningResources": [
+      { "title": "The Art of PostgreSQL", "type": "book", "estimatedHours": 30 },
+      { "title": "Take a slow query and cut it 10x using EXPLAIN ANALYZE, writing down each hypothesis", "type": "project", "estimatedHours": 10 }
+    ]
+  },
+  {
+    "skillId": "skill-kubernetes", "name": "kubernetes", "category": "infrastructure",
+    "description": "Container orchestration; workloads, networking, resource limits, and debugging live clusters.",
+    "relatedSkills": ["skill-docker", "skill-terraform"],
+    "learningResources": [
+      { "title": "Kubernetes Up & Running, 3rd ed.", "type": "book", "estimatedHours": 25 },
+      { "title": "Run a stateful service on a local cluster and deliberately break it six ways", "type": "project", "estimatedHours": 18 }
+    ]
+  },
+  {
+    "skillId": "skill-docker", "name": "docker", "category": "infrastructure",
+    "description": "Containerisation; image layering, multi-stage builds, and keeping images small and reproducible.",
+    "relatedSkills": ["skill-kubernetes"],
+    "learningResources": [
+      { "title": "Docker official documentation", "type": "docs", "estimatedHours": 6 },
+      { "title": "Take an existing app's image below 100MB without breaking it", "type": "project", "estimatedHours": 8 }
+    ]
+  },
+  {
+    "skillId": "skill-terraform", "name": "terraform", "category": "infrastructure",
+    "description": "Declarative infrastructure; module design, state management, and safe plan-review habits.",
+    "relatedSkills": ["skill-aws", "skill-kubernetes"],
+    "learningResources": [
+      { "title": "Terraform: Up & Running, 3rd ed.", "type": "book", "estimatedHours": 22 },
+      { "title": "Reproduce a hand-built environment entirely in Terraform, then destroy and re-apply it", "type": "project", "estimatedHours": 16 }
+    ]
+  },
+  {
+    "skillId": "skill-aws", "name": "aws", "category": "cloud",
+    "description": "Core AWS services, IAM as the real skill, and cost-aware architecture.",
+    "relatedSkills": ["skill-terraform", "skill-kubernetes"],
+    "learningResources": [
+      { "title": "AWS Solutions Architect Associate", "type": "course", "estimatedHours": 40 },
+      { "title": "Deploy a multi-service app and write the least-privilege IAM policy by hand", "type": "project", "estimatedHours": 20 }
+    ]
+  },
+  {
+    "skillId": "skill-system-design", "name": "system design", "category": "domain",
+    "description": "Designing systems under real constraints: failure modes, data flow, and defensible trade-offs.",
+    "relatedSkills": ["skill-postgres", "skill-mongodb"],
+    "learningResources": [
+      { "title": "Designing Data-Intensive Applications", "type": "book", "estimatedHours": 50 },
+      { "title": "Write design docs for three systems you use daily, then find where you were wrong", "type": "project", "estimatedHours": 20 }
+    ]
+  },
+  {
+    "skillId": "skill-typescript", "name": "typescript", "category": "language",
+    "description": "Typed JavaScript; the type system, inference, and where escape hatches are legitimate.",
+    "relatedSkills": ["skill-react"],
+    "learningResources": [
+      { "title": "TypeScript Handbook", "type": "docs", "estimatedHours": 12 },
+      { "title": "Convert a JavaScript codebase to strict mode with no `any`", "type": "project", "estimatedHours": 15 }
+    ]
+  },
+  {
+    "skillId": "skill-react", "name": "react", "category": "framework",
+    "description": "Component UI framework; state, effects, rendering behaviour, and performance work.",
+    "relatedSkills": ["skill-typescript"],
+    "learningResources": [
+      { "title": "react.dev learn track", "type": "docs", "estimatedHours": 15 },
+      { "title": "Build a data-heavy dashboard and profile it to 60fps", "type": "project", "estimatedHours": 20 }
+    ]
+  },
+  {
+    "skillId": "skill-go", "name": "go", "category": "language",
+    "description": "Systems language for services; concurrency, interfaces, and its deliberate lack of features.",
+    "relatedSkills": ["skill-system-design", "skill-kubernetes"],
+    "learningResources": [
+      { "title": "Learning Go, 2nd ed.", "type": "book", "estimatedHours": 28 },
+      { "title": "Build a concurrent worker pool with proper cancellation and backpressure", "type": "project", "estimatedHours": 14 }
+    ]
+  },
+  {
+    "skillId": "skill-leadership", "name": "technical leadership", "category": "soft",
+    "description": "Leading without authority, then with it: direction-setting, feedback, and growing other engineers.",
+    "relatedSkills": ["skill-system-design"],
+    "learningResources": [
+      { "title": "The Manager's Path", "type": "book", "estimatedHours": 14 },
+      { "title": "Lead a cross-team project end to end and run its retrospective", "type": "project", "estimatedHours": 40 },
+      { "title": "Staff Engineer: Leadership Beyond the Management Track", "type": "book", "estimatedHours": 12 }
+    ]
+  }
+]

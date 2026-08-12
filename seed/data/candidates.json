@@ -1,0 +1,44 @@
+[
+  {
+    "candidateId": "cand-0001",
+    "name": "Priya Raman",
+    "email": "priya.raman@example.com",
+    "profile": {
+      "currentRole": "Backend Engineer",
+      "seniority": "mid",
+      "yearsExperience": 4,
+      "location": "London, UK",
+      "skills": ["python", "postgres", "aws", "docker", "system design"],
+      "targetRole": "Machine Learning Engineer",
+      "constraints": ["hybrid or remote", "London-based, no relocation"]
+    }
+  },
+  {
+    "candidateId": "cand-0002",
+    "name": "Tomás Oliveira",
+    "email": "tomas.oliveira@example.com",
+    "profile": {
+      "currentRole": "Frontend Engineer",
+      "seniority": "mid",
+      "yearsExperience": 5,
+      "location": "Rotterdam, Netherlands",
+      "skills": ["typescript", "react", "docker"],
+      "targetRole": "Full-Stack Engineer",
+      "constraints": ["prioritising work-life balance", "EU only"]
+    }
+  },
+  {
+    "candidateId": "cand-0003",
+    "name": "Dana Whitfield",
+    "email": "dana.whitfield@example.com",
+    "profile": {
+      "currentRole": "Senior Backend Engineer",
+      "seniority": "senior",
+      "yearsExperience": 9,
+      "location": "New York, NY, USA",
+      "skills": ["typescript", "go", "system design", "kubernetes", "technical leadership"],
+      "targetRole": "Engineering Manager",
+      "constraints": ["first management role", "hybrid, NYC"]
+    }
+  }
+]

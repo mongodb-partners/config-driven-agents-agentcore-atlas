@@ -1,0 +1,204 @@
+[
+  {
+    "jobId": "job-ml-eng-acme-001",
+    "title": "Machine Learning Engineer",
+    "company": "Acme Robotics",
+    "companyId": "co-acme-robotics",
+    "location": "London, UK",
+    "remote": "hybrid",
+    "seniority": "mid",
+    "employmentType": "full-time",
+    "description": "Build and ship perception models for warehouse automation robots. You will own models from training through to on-robot deployment, working alongside robotics engineers rather than handing off to them.",
+    "responsibilities": [
+      "Own model training pipelines end to end, from data collection to evaluation",
+      "Deploy and monitor models running on constrained on-robot hardware",
+      "Partner with robotics engineers on the perception-to-control interface",
+      "Improve the evaluation harness so regressions are caught before customer pilots"
+    ],
+    "requiredSkills": [
+      { "skillId": "skill-python", "name": "python", "importance": "core" },
+      { "skillId": "skill-machine-learning", "name": "machine learning", "importance": "core" },
+      { "skillId": "skill-pytorch", "name": "pytorch", "importance": "important" },
+      { "skillId": "skill-docker", "name": "docker", "importance": "nice" }
+    ],
+    "yearsExperience": { "min": 3, "max": 6 },
+    "postedAt": "2026-06-01"
+  },
+  {
+    "jobId": "job-backend-acme-002",
+    "title": "Senior Backend Engineer, Fleet Services",
+    "company": "Acme Robotics",
+    "companyId": "co-acme-robotics",
+    "location": "London, UK",
+    "remote": "hybrid",
+    "seniority": "senior",
+    "employmentType": "full-time",
+    "description": "Own the services that coordinate a fleet of robots across customer warehouses — scheduling, telemetry ingestion, and the APIs customers integrate against.",
+    "responsibilities": [
+      "Design and run high-throughput telemetry ingestion from thousands of robots",
+      "Own the public fleet API and its versioning story",
+      "Lead the on-call practice for fleet services",
+      "Mentor two mid-level engineers on the team"
+    ],
+    "requiredSkills": [
+      { "skillId": "skill-python", "name": "python", "importance": "core" },
+      { "skillId": "skill-system-design", "name": "system design", "importance": "core" },
+      { "skillId": "skill-kubernetes", "name": "kubernetes", "importance": "important" },
+      { "skillId": "skill-mongodb", "name": "mongodb", "importance": "important" },
+      { "skillId": "skill-leadership", "name": "technical leadership", "importance": "nice" }
+    ],
+    "yearsExperience": { "min": 6, "max": 10 },
+    "postedAt": "2026-05-18"
+  },
+  {
+    "jobId": "job-platform-northwind-003",
+    "title": "Platform Engineer, Clinical Data",
+    "company": "Northwind Health",
+    "companyId": "co-northwind-health",
+    "location": "Boston, MA, USA",
+    "remote": "remote",
+    "seniority": "mid",
+    "employmentType": "full-time",
+    "description": "Build the internal platform that clinical product teams deploy on. Regulated environment — every change is audited, and that constraint shapes the work.",
+    "responsibilities": [
+      "Own Terraform modules used by 30+ product teams",
+      "Build the audit and compliance tooling that gates production deploys",
+      "Reduce CI time for the main monorepo",
+      "Run the internal developer support rotation"
+    ],
+    "requiredSkills": [
+      { "skillId": "skill-terraform", "name": "terraform", "importance": "core" },
+      { "skillId": "skill-aws", "name": "aws", "importance": "core" },
+      { "skillId": "skill-kubernetes", "name": "kubernetes", "importance": "important" },
+      { "skillId": "skill-python", "name": "python", "importance": "nice" }
+    ],
+    "yearsExperience": { "min": 3, "max": 7 },
+    "postedAt": "2026-06-10"
+  },
+  {
+    "jobId": "job-data-eng-northwind-004",
+    "title": "Senior Data Engineer",
+    "company": "Northwind Health",
+    "companyId": "co-northwind-health",
+    "location": "Boston, MA, USA",
+    "remote": "remote",
+    "seniority": "senior",
+    "employmentType": "full-time",
+    "description": "Own the pipelines that turn raw clinical feeds into the datasets analytics and ML teams depend on. Correctness matters more than speed here.",
+    "responsibilities": [
+      "Design and operate Kafka-based ingestion for HL7 and FHIR feeds",
+      "Own data quality contracts between ingestion and downstream consumers",
+      "Partner with the compliance team on data retention and de-identification",
+      "Mentor engineers joining from non-healthcare backgrounds"
+    ],
+    "requiredSkills": [
+      { "skillId": "skill-python", "name": "python", "importance": "core" },
+      { "skillId": "skill-postgres", "name": "postgres", "importance": "core" },
+      { "skillId": "skill-system-design", "name": "system design", "importance": "important" },
+      { "skillId": "skill-aws", "name": "aws", "importance": "nice" }
+    ],
+    "yearsExperience": { "min": 5, "max": 9 },
+    "postedAt": "2026-05-30"
+  },
+  {
+    "jobId": "job-backend-lumen-005",
+    "title": "Backend Engineer, Payment Rails",
+    "company": "Lumen Fintech",
+    "companyId": "co-lumen-fintech",
+    "location": "Berlin, Germany",
+    "remote": "remote",
+    "seniority": "mid",
+    "employmentType": "full-time",
+    "description": "Own a payment rail end to end — the integration, the reconciliation, and the on-call. Small squad, very high autonomy, minimal direction.",
+    "responsibilities": [
+      "Integrate and operate a national payment scheme end to end",
+      "Build reconciliation tooling that finance uses daily",
+      "Carry the pager for your own rail",
+      "Write the runbooks nobody else will write for you"
+    ],
+    "requiredSkills": [
+      { "skillId": "skill-go", "name": "go", "importance": "core" },
+      { "skillId": "skill-postgres", "name": "postgres", "importance": "core" },
+      { "skillId": "skill-system-design", "name": "system design", "importance": "important" },
+      { "skillId": "skill-kubernetes", "name": "kubernetes", "importance": "nice" }
+    ],
+    "yearsExperience": { "min": 3, "max": 6 },
+    "postedAt": "2026-06-05"
+  },
+  {
+    "jobId": "job-ml-eng-tessellate-006",
+    "title": "Machine Learning Engineer, Retrieval",
+    "company": "Tessellate AI",
+    "companyId": "co-tessellate-ai",
+    "location": "San Francisco, CA, USA",
+    "remote": "onsite",
+    "seniority": "senior",
+    "employmentType": "full-time",
+    "description": "Own the retrieval layer behind our developer assistant — embeddings, vector indexes, ranking, and the evaluations that keep them honest. Frontier pace, in-office four days a week.",
+    "responsibilities": [
+      "Own the embedding and re-ranking stack end to end",
+      "Design offline and online evaluations for retrieval quality",
+      "Scale vector search to billions of documents without losing recall",
+      "Work directly with founders on product direction"
+    ],
+    "requiredSkills": [
+      { "skillId": "skill-python", "name": "python", "importance": "core" },
+      { "skillId": "skill-machine-learning", "name": "machine learning", "importance": "core" },
+      { "skillId": "skill-vector-search", "name": "vector search", "importance": "core" },
+      { "skillId": "skill-pytorch", "name": "pytorch", "importance": "important" },
+      { "skillId": "skill-mongodb", "name": "mongodb", "importance": "nice" }
+    ],
+    "yearsExperience": { "min": 5, "max": 10 },
+    "postedAt": "2026-06-14"
+  },
+  {
+    "jobId": "job-fullstack-harbour-007",
+    "title": "Full-Stack Engineer, Shipment Visibility",
+    "company": "Harbour Logistics",
+    "companyId": "co-harbour-logistics",
+    "location": "Rotterdam, Netherlands",
+    "remote": "hybrid",
+    "seniority": "mid",
+    "employmentType": "full-time",
+    "description": "Build the customer-facing shipment tracking experience and the services behind it. Steady pace, real 40-hour weeks, systems that have been running for a decade.",
+    "responsibilities": [
+      "Build and maintain the shipment visibility UI in React",
+      "Own the backing services in Java and Python",
+      "Pair daily with a rotating partner on non-trivial work",
+      "Improve the existing system rather than rewrite it"
+    ],
+    "requiredSkills": [
+      { "skillId": "skill-typescript", "name": "typescript", "importance": "core" },
+      { "skillId": "skill-react", "name": "react", "importance": "core" },
+      { "skillId": "skill-postgres", "name": "postgres", "importance": "important" },
+      { "skillId": "skill-docker", "name": "docker", "importance": "nice" }
+    ],
+    "yearsExperience": { "min": 2, "max": 6 },
+    "postedAt": "2026-04-22"
+  },
+  {
+    "jobId": "job-eng-manager-vertex-008",
+    "title": "Engineering Manager, Playback",
+    "company": "Vertex Media",
+    "companyId": "co-vertex-media",
+    "location": "New York, NY, USA",
+    "remote": "hybrid",
+    "seniority": "staff",
+    "employmentType": "full-time",
+    "description": "Lead the team that owns video playback across every client. A first management role is welcome if you have been a tech lead — the team is stable and senior.",
+    "responsibilities": [
+      "Manage and grow a team of seven engineers across web and mobile",
+      "Own playback reliability and startup-time targets",
+      "Represent playback at the quarterly architecture review board",
+      "Run hiring for the team"
+    ],
+    "requiredSkills": [
+      { "skillId": "skill-leadership", "name": "technical leadership", "importance": "core" },
+      { "skillId": "skill-system-design", "name": "system design", "importance": "core" },
+      { "skillId": "skill-typescript", "name": "typescript", "importance": "important" },
+      { "skillId": "skill-react", "name": "react", "importance": "nice" }
+    ],
+    "yearsExperience": { "min": 8, "max": 15 },
+    "postedAt": "2026-06-02"
+  }
+]
