@@ -1,9 +1,30 @@
 # MongoDB Atlas — operational store, vector store, memory, and trace sink.
 #
-# A dedicated project per workshop attendee, so `terraform destroy` takes the
-# whole thing with it and nothing leaks into an existing project.
+# Two ways to get one:
+#
+#   Default        A dedicated project and cluster per attendee, so
+#                  `terraform destroy` takes the whole thing with it and nothing
+#                  leaks into an existing project. Costs ~10 minutes of the
+#                  deploy, which on a two-hour workshop clock is real money.
+#
+#   mongodb_uri    Bring your own. Every resource below is skipped, the provided
+#                  connection string goes straight into Secrets Manager, and the
+#                  cluster outlives `destroy`. You own the network access list,
+#                  the database user, and the tier.
+#
+# Everything downstream reads `local.mongodb_uri` and cannot tell the difference.
+
+locals {
+  # nonsensitive() because the *answer* — "did you bring a cluster?" — is not a
+  # secret, and without it every value derived from this flag inherits the URI's
+  # sensitivity and cannot be output or printed.
+  byo_atlas   = nonsensitive(var.mongodb_uri != "")
+  atlas_count = local.byo_atlas ? 0 : 1
+}
 
 resource "mongodbatlas_project" "this" {
+  count = local.atlas_count
+
   name   = var.project_name
   org_id = var.atlas_org_id
 }
@@ -14,7 +35,9 @@ resource "random_password" "atlas_user" {
 }
 
 resource "mongodbatlas_advanced_cluster" "this" {
-  project_id     = mongodbatlas_project.this.id
+  count = local.atlas_count
+
+  project_id     = mongodbatlas_project.this[0].id
   name           = local.name_dns # Atlas cluster names forbid underscores
   cluster_type   = "REPLICASET"
   backup_enabled = false
@@ -29,12 +52,21 @@ resource "mongodbatlas_advanced_cluster" "this" {
         instance_size = var.atlas_cluster_tier
         node_count    = 3
       }
+
+      # Automated Embedding (embedding_mode = "auto") requires this on dedicated
+      # clusters: Atlas pauses embedding generation and marks the index Stale if
+      # the disk fills. Harmless in the other modes.
+      auto_scaling {
+        disk_gb_enabled = true
+      }
     }
   }
 }
 
 resource "mongodbatlas_database_user" "agent" {
-  project_id         = mongodbatlas_project.this.id
+  count = local.atlas_count
+
+  project_id         = mongodbatlas_project.this[0].id
   username           = "${var.project_name}-agent"
   password           = random_password.atlas_user.result
   auth_database_name = "admin"
@@ -54,17 +86,20 @@ resource "mongodbatlas_database_user" "agent" {
 # Agents and the MCP runtime reach Atlas over the public internet (workshop
 # simplicity — no VPC peering or PrivateLink), so the project must accept it.
 resource "mongodbatlas_project_ip_access_list" "public" {
-  project_id = mongodbatlas_project.this.id
+  count = local.atlas_count
+
+  project_id = mongodbatlas_project.this[0].id
   cidr_block = "0.0.0.0/0"
   comment    = "Workshop: AgentCore runtimes and EC2 reach Atlas over public internet"
 }
 
 locals {
-  # Inject credentials into the SRV string Atlas hands back.
-  mongodb_uri = replace(
-    mongodbatlas_advanced_cluster.this.connection_strings[0].standard_srv,
+  # Inject credentials into the SRV string Atlas hands back. A bring-your-own URI
+  # already carries its own.
+  mongodb_uri = local.byo_atlas ? var.mongodb_uri : replace(
+    mongodbatlas_advanced_cluster.this[0].connection_strings[0].standard_srv,
     "mongodb+srv://",
-    "mongodb+srv://${mongodbatlas_database_user.agent.username}:${random_password.atlas_user.result}@"
+    "mongodb+srv://${mongodbatlas_database_user.agent[0].username}:${random_password.atlas_user.result}@"
   )
 }
 

@@ -2,8 +2,8 @@
 
 Three tools that MCP cannot provide on its own:
 
-- `vector_search`      — embeds the query here, so the 1024-float vector reaches
-                         Atlas without ever entering the model's context
+- `vector_search`      — takes text; the vector is built outside the model's
+                         context, or by Atlas itself in auto-embedding mode
 - `recall_conversation`— the same, scoped to this candidate's own past turns
 - `read_skill_resource`— pulls a reference doc off the image on demand
 
@@ -18,7 +18,6 @@ import json
 from strands import tool
 
 import agent_config
-import embeddings
 import memory
 import mongo_mcp
 
@@ -61,8 +60,7 @@ def build_tools(agent: agent_config.AgentDef) -> list:
             return f"Error: filter is not valid JSON: {filter}"
 
         docs = mongo_mcp.vector_search(
-            collection, embeddings.embed(query_text),
-            limit=max(1, min(limit, 20)), filter=parsed,
+            collection, query_text, limit=max(1, min(limit, 20)), filter=parsed,
         )
         if not docs:
             return f"No documents in '{collection}' matched. Do not invent one — say nothing was found."

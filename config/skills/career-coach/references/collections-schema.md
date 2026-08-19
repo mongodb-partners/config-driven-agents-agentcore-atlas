@@ -1,7 +1,8 @@
 # Collections — career-coach
 
-All three collections are **read-only**. Every one carries a 1024-dim `embedding` field;
-never project it into your context and never mention it.
+All three collections are **read-only**. Every one carries a vector-search field — a
+1024-dim `embedding`, or a `searchText` copy when the deployment uses Atlas
+auto-embedding. Never project either into your context and never mention them.
 
 ---
 

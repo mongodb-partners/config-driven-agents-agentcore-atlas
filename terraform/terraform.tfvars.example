@@ -1,15 +1,31 @@
 # Copy to terraform.tfvars and fill in. That file is gitignored — it holds secrets.
 
-# ── Required: MongoDB Atlas ───────────────────────────────────────────────────
+# ── MongoDB Atlas: create one, or bring your own ──────────────────────────────
+#
+# Option A (default) — Terraform creates a dedicated project and cluster, and
+# `./deploy.sh destroy` removes both. Costs ~10 minutes of the deploy.
 # Atlas → Organization → Access Manager → API Keys.
 # The key needs the "Organization Project Creator" role.
 atlas_org_id      = "REPLACE_ME"
 atlas_public_key  = "REPLACE_ME"
 atlas_private_key = "REPLACE_ME"
 
+# Option B — you already have a cluster. Uncomment this, delete the three lines
+# above, and Terraform creates no Atlas resources at all: deploy drops to ~10
+# minutes and destroy leaves your cluster and its data alone.
+#
+# Yours to get right, because nothing here manages them:
+#   · network access reaching the AgentCore runtimes and the EC2 box (0.0.0.0/0)
+#   · a user with readWrite on mongodb_db AND atlasAdmin on admin — the seed
+#     creates Atlas Search indexes, which readWrite alone cannot do
+#   · a tier with room for 7 vector indexes (M0 allows 3)
+#
+# mongodb_uri = "mongodb+srv://user:password@cluster.abcde.mongodb.net/"
+
 # ── Optional ──────────────────────────────────────────────────────────────────
 
-# Must have Bedrock AgentCore plus Claude Haiku 4.5 and Titan Embed v2 enabled.
+# Must have Bedrock AgentCore and Claude Haiku 4.5 enabled — plus Titan Embed v2
+# if embedding_mode is "titan".
 aws_region   = "us-east-1"
 atlas_region = "US_EAST_1"
 
@@ -18,14 +34,33 @@ project_name = "riv-workshop"
 
 # M10 is the default because the free M0 tier allows only three Atlas Search
 # indexes and this stack needs seven. Roughly USD 0.11/hour — destroy when done.
+# Ignored when mongodb_uri is set.
 atlas_cluster_tier = "M10"
 
-# Leave empty to embed with Bedrock Titan (no extra account needed).
-# Set it to use Voyage AI instead — both are 1024-dim, so nothing else changes.
+# ── Embeddings: pick one ──────────────────────────────────────────────────────
+# Who turns text into vectors. This decides the shape of the Atlas index, so
+# changing it later means rebuilding the indexes and re-seeding.
+#
+#   "atlas-voyage"  the app calls Voyage through the Atlas Embedding API.
+#                   Requires voyage_api_key below.
+#   "auto"          MongoDB Atlas Automated Embedding — Atlas embeds in-cluster.
+#                   No key at all. Preview feature; needs M10+ with storage
+#                   auto-scaling (atlas.tf turns it on).
+#   "titan"         Bedrock Titan v2. No key beyond AWS.
+#
+# Leave it out and ./deploy.sh will ask, then write your answer here.
+embedding_mode = "atlas-voyage"
+
+# Required for "atlas-voyage", ignored by the other two modes.
+#   al-…  MongoDB Atlas model API key  → ai.mongodb.com
+#   pa-…  Voyage AI key                → api.voyageai.com
+# Mixing them up returns 403; the prefix picks the endpoint automatically.
 voyage_api_key = ""
 
-# Only used when voyage_api_key is set. voyage-4 is the current generation.
-# Alternatives: voyage-4-lite, voyage-4-large, voyage-3.5, voyage-3-large, voyage-3.
+# Used by "atlas-voyage" (sent to the API) and by "auto" (written into the index).
+#   atlas-voyage: voyage-4, voyage-4-lite, voyage-4-large, voyage-3.5, voyage-3.5-lite,
+#                 voyage-3, voyage-3-large
+#   auto:         voyage-4, voyage-4-large, voyage-4-lite, voyage-code-3
 voyage_embed_model = "voyage-4"
 
 # Narrow this to your own IP/32 if your network allows it.

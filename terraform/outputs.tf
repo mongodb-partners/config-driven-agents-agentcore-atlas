@@ -32,9 +32,9 @@ output "cloudwatch_log_groups" {
 output "atlas_cluster" {
   description = "Atlas cluster name and project. Browse the collections to see what the agents wrote."
   value = {
-    project  = mongodbatlas_project.this.name
-    cluster  = mongodbatlas_advanced_cluster.this.name
-    tier     = var.atlas_cluster_tier
+    project  = local.byo_atlas ? "(your own, not managed here)" : mongodbatlas_project.this[0].name
+    cluster  = local.byo_atlas ? "(your own, not managed here)" : mongodbatlas_advanced_cluster.this[0].name
+    tier     = local.byo_atlas ? "(your own, not managed here)" : var.atlas_cluster_tier
     database = var.mongodb_db
   }
 }

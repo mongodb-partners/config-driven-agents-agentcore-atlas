@@ -9,8 +9,10 @@ Idempotent: re-running replaces documents and leaves existing indexes alone.
 
     MONGODB_URI='mongodb+srv://...' AWS_REGION=us-east-1 python seed/seed.py
 
-Embedding provider follows the agents': Titan by default, Voyage if
-VOYAGE_API_KEY is set. Both are 1024-dim, so the indexes are the same either way.
+Embedding mode follows the agents' — `EMBEDDING_MODE` picks one of atlas-voyage
+(default), auto, or titan. In the first two this script embeds the corpus and
+stores vectors; in `auto` it stores plain text in `searchText` and Atlas embeds
+it behind an `autoEmbed` index. Everything downstream is the same either way.
 """
 
 from __future__ import annotations
@@ -102,13 +104,15 @@ def load(name: str) -> list[dict]:
 def seed_domain(db) -> None:
     for name, (key, to_text, _) in DOMAIN.items():
         docs = load(name)
-        print(f"  {name}: embedding {len(docs)} documents…", flush=True)
+        verb = "preparing" if embeddings.AUTO else "embedding"
+        print(f"  {name}: {verb} {len(docs)} documents…", flush=True)
         # One batched call per collection rather than one per document: Voyage's
-        # free tier allows only a handful of requests a minute.
-        vectors = embeddings.embed_many([to_text(d) for d in docs])
+        # free tier allows only a handful of requests a minute. In auto mode this
+        # makes no API call at all.
+        fields = embeddings.index_fields([to_text(d) for d in docs])
         ops = []
-        for doc, vector in zip(docs, vectors):
-            doc["embedding"] = vector
+        for doc, field in zip(docs, fields):
+            doc.update(field)
             ops.append(UpdateOne({key: doc[key]}, {"$set": doc}, upsert=True))
         result = db[name].bulk_write(ops)
         print(f"  {name}: {result.upserted_count} inserted, {result.modified_count} updated")
@@ -119,6 +123,27 @@ def seed_domain(db) -> None:
         [UpdateOne({"candidateId": d["candidateId"]}, {"$set": d}, upsert=True) for d in docs]
     )
     print(f"  candidates: {len(docs)} upserted")
+
+
+def vector_index_definition(filters: list[str]) -> dict:
+    """The index definition for the active embedding mode.
+
+    `vector` and `autoEmbed` cannot coexist in one definition, which is why the
+    mode is a deploy-time choice rather than a per-query one. The autoEmbed form
+    omits numDimensions/similarity deliberately — Atlas fills in the right
+    defaults for the model, and pinning them here would only go stale.
+    """
+    if embeddings.AUTO:
+        vector_field = {"type": "autoEmbed", "modality": "text",
+                        "path": embeddings.AUTO_FIELD, "model": embeddings.VOYAGE_MODEL}
+    else:
+        vector_field = {"type": "vector", "path": embeddings.VECTOR_FIELD,
+                        "numDimensions": embeddings.EMBEDDING_DIMS, "similarity": "cosine"}
+
+    return {"fields": [
+        vector_field,
+        *({"type": "filter", "path": f} for f in filters),
+    ]}
 
 
 def ensure_vector_index(db, collection: str, filters: list[str]) -> bool:
@@ -136,11 +161,7 @@ def ensure_vector_index(db, collection: str, filters: list[str]) -> bool:
     coll.create_search_index(SearchIndexModel(
         name=name,
         type="vectorSearch",
-        definition={"fields": [
-            {"type": "vector", "path": "embedding",
-             "numDimensions": embeddings.EMBEDDING_DIMS, "similarity": "cosine"},
-            *({"type": "filter", "path": f} for f in filters),
-        ]},
+        definition=vector_index_definition(filters),
     ))
     print(f"  {name}: creating…")
     return True
@@ -173,6 +194,41 @@ def wait_for_indexes(db, collections: list[str], timeout_s: int = 600) -> None:
         raise TimeoutError(f"indexes still building after {timeout_s}s: {', '.join(sorted(pending))}")
 
 
+def wait_for_auto_embeddings(db, collections: list[str], timeout_s: int = 900) -> None:
+    """Block until an `autoEmbed` index actually answers a query.
+
+    READY means the index exists, not that Atlas has finished embedding the
+    documents behind it — that happens asynchronously after the write. So poll a
+    real `$vectorSearch` rather than a status field: until it returns something,
+    an agent asking a perfectly good question gets "nothing found".
+    """
+    pending = [c for c in collections if db[c].estimated_document_count()]
+    deadline = time.time() + timeout_s
+    while pending and time.time() < deadline:
+        for collection in list(pending):
+            hits = list(db[collection].aggregate([
+                {"$vectorSearch": {
+                    "index": f"{collection}_vector_index",
+                    "path": embeddings.AUTO_FIELD,
+                    "query": {"text": "engineer"},
+                    "numCandidates": 20,
+                    "limit": 1,
+                }},
+                {"$project": {"_id": 1}},
+            ]))
+            if hits:
+                pending.remove(collection)
+                print(f"  {collection}: embeddings ready")
+        if pending:
+            time.sleep(15)
+    if pending:
+        raise TimeoutError(
+            f"Atlas is still generating embeddings after {timeout_s}s for: "
+            f"{', '.join(sorted(pending))}. Check that storage auto-scaling is on — "
+            f"a full disk pauses embedding generation and marks the index Stale."
+        )
+
+
 def main() -> None:
     uri = os.environ.get("MONGODB_URI")
     if not uri:
@@ -180,8 +236,10 @@ def main() -> None:
 
     db = MongoClient(uri, serverSelectionTimeoutMS=20000)[DB_NAME]
     db.command("ping")
-    print(f"━━ Seeding '{DB_NAME}' — embeddings via {embeddings.provider()} "
-          f"({embeddings.EMBEDDING_DIMS}d) ━━\n")
+    detail = (f"model {embeddings.VOYAGE_MODEL}, generated in-cluster"
+              if embeddings.AUTO else f"{embeddings.EMBEDDING_DIMS}d, generated here")
+    print(f"━━ Seeding '{DB_NAME}' — embedding mode {embeddings.provider()} "
+          f"({detail}) ━━\n")
 
     print("Documents:")
     seed_domain(db)
@@ -209,6 +267,9 @@ def main() -> None:
     if created:
         print("\nWaiting for vector indexes to build (a few minutes on a new cluster):")
         wait_for_indexes(db, created)
+        if embeddings.AUTO:
+            print("\nWaiting for Atlas to embed the documents:")
+            wait_for_auto_embeddings(db, created)
 
     print("\n✅ Seed complete.")
 

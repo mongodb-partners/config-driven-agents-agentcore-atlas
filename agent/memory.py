@@ -4,7 +4,7 @@
   for us, scoped to (actor, session).
 - **Long term** — MongoDB Atlas, three collections:
   - `agent_facts`    durable facts about a candidate, extracted by an LLM
-  - `chat_messages`  every turn, individually embedded and semantically searchable
+  - `chat_messages`  every turn, embedded and semantically searchable
   - `chat_sessions`  one row per conversation, for the UI's session list
 
 Facts are recalled at the *start* of a session. `chat_messages` is recalled
@@ -119,8 +119,9 @@ def extract_facts(user_id: str, session_id: str, user_text: str, assistant_text:
         return []
 
     # One embedding call for all facts, not one per fact — each round trip is a
-    # rate-limit opportunity, and they are all available at once.
-    vectors = embeddings.embed_many([t for t, _ in kept])
+    # rate-limit opportunity, and they are all available at once. In auto mode
+    # this costs nothing: the text goes in as text and Atlas embeds it.
+    fields = embeddings.index_fields([t for t, _ in kept])
     docs = [
         {
             "userId": user_id,
@@ -128,9 +129,9 @@ def extract_facts(user_id: str, session_id: str, user_text: str, assistant_text:
             "text": text,
             "kind": kind,
             "createdAt": _now(),
-            "embedding": vector,
+            **field,
         }
-        for (text, kind), vector in zip(kept, vectors)
+        for (text, kind), field in zip(kept, fields)
     ]
     mongo_mcp.insert("agent_facts", docs)
     return [{"text": d["text"], "kind": d["kind"]} for d in docs]
@@ -140,7 +141,7 @@ def recall_facts(user_id: str, query_text: str, limit: int = 6) -> list[dict]:
     """Semantic recall over everything known about this candidate."""
     return mongo_mcp.vector_search(
         "agent_facts",
-        embeddings.embed(query_text),
+        query_text,
         limit=limit,
         filter={"userId": user_id},
     )
@@ -160,7 +161,11 @@ def store_messages(user_id: str, session_id: str, agent_id: str,
     if not kept:
         return 0
 
-    vectors = embeddings.embed_many([text for _, text in kept])
+    # ponytail: in auto mode Atlas embeds these asynchronously, so a turn is not
+    # semantically recallable the instant it is written. Nobody asks about the
+    # sentence they just typed, and the short-term buffer covers the current
+    # session anyway — add a read-after-write wait only if that stops being true.
+    fields = embeddings.index_fields([text for _, text in kept])
     mongo_mcp.insert("chat_messages", [
         {
             "userId": user_id,
@@ -169,9 +174,9 @@ def store_messages(user_id: str, session_id: str, agent_id: str,
             "role": role,
             "text": text,
             "createdAt": _now(),
-            "embedding": vector,
+            **field,
         }
-        for (role, text), vector in zip(kept, vectors)
+        for (role, text), field in zip(kept, fields)
     ])
     return len(kept)
 
@@ -187,7 +192,7 @@ def recall_conversation(user_id: str, query_text: str, limit: int = 5,
     if exclude_session:
         mongo_filter["sessionId"] = {"$ne": exclude_session}
     return mongo_mcp.vector_search(
-        "chat_messages", embeddings.embed(query_text), limit=limit, filter=mongo_filter
+        "chat_messages", query_text, limit=limit, filter=mongo_filter
     )
 
 
