@@ -92,6 +92,13 @@ cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 ./deploy.sh
 ```
 
+On the first run `deploy.sh` asks how you want text embedded and writes the answer
+into `terraform.tfvars` as `embedding_mode`. The three options are covered in
+[Three ways to embed](#three-ways-to-embed--pick-one-before-you-deploy); the short
+version is that the default needs a Voyage/Atlas API key, `auto` needs no key at
+all, and `titan` needs Bedrock model access. Whichever you pick, the required
+secret is checked before anything is created — not fifteen minutes in.
+
 15–20 minutes. The Atlas cluster and the ARM64 image builds run in parallel; the
 instance then seeds Atlas and waits for the vector indexes before serving. When
 the UI answers, the data is ready.
@@ -101,6 +108,26 @@ Open the `ui_url` from the output.
 ```bash
 ./deploy.sh destroy      # removes everything, including the Atlas project
 ```
+
+### Bring your own cluster
+
+Provisioning an M10 is about ten of those twenty minutes. If you already have a
+cluster — running the workshop a second time, or reusing a dev cluster — set its
+connection string instead and Terraform creates no Atlas resources at all:
+
+```hcl
+# terraform/terraform.tfvars
+mongodb_uri = "mongodb+srv://user:password@cluster.abcde.mongodb.net/"
+```
+
+Deploy drops to 8–12 minutes, `atlas_org_id` and the Atlas API keys become
+unnecessary, and `destroy` leaves your cluster and its data alone. In exchange you
+own the parts Terraform was doing for you: network access reaching the AgentCore
+runtimes and the EC2 box, a user with `readWrite` on the database plus
+`atlasAdmin` on `admin` (the seed creates Search indexes), and a tier with room
+for 7 vector indexes. `deploy.sh` prints that list before it starts, and
+[PRE_REQUISITES §3.0](PRE_REQUISITES.md#30-new-cluster-or-one-you-already-have)
+has the detail.
 
 ---
 
@@ -205,26 +232,70 @@ server, so an agent cannot call them regardless of what a prompt says.
 
 The MCP server has no vector-search tool, and a 1024-float array has no business
 in a model's context anyway. So `vector_search(collection, query_text)` is a local
-tool: it embeds the query in-process, then calls the MCP `aggregate` tool with a
-`$vectorSearch` stage. The model sends text and gets documents back.
+tool: it passes text to [`mongo_mcp.vector_search`](agent/mongo_mcp.py), which calls
+the MCP `aggregate` tool with a `$vectorSearch` stage. The model sends text and
+gets documents back, and never sees a vector in either direction.
 
-Embeddings default to **Bedrock Titan v2**. Set `voyage_api_key` to use Voyage
-instead, and `voyage_embed_model` to pick the model (`voyage-4` by default). Every
-option is 1024-dim, so the Atlas indexes are unchanged either way — but switching
-changes the vectors, so re-run the seed after a change.
+### Three ways to embed — pick one before you deploy
 
-Voyage keys come in two flavours and hit different endpoints. The prefix decides,
-and [`embeddings.py`](agent/embeddings.py) detects it — an `al-…` key is issued by
-MongoDB Atlas and goes to `ai.mongodb.com`, a `pa-…` key is native Voyage and goes
-to `api.voyageai.com`. Using one against the other's endpoint returns `403`.
-`VOYAGE_API_BASE` overrides the detection.
+`embedding_mode` decides *who* turns text into vectors. `./deploy.sh` asks on the
+first run and records the answer in `terraform.tfvars`; after that both the script
+and Terraform refuse to deploy if the mode and the secrets disagree.
 
-> **Rate limits are a runtime concern, not just a seeding one.** A single turn
+| `embedding_mode` | Who embeds | Needs | Document field | Index field type |
+|---|---|---|---|---|
+| `atlas-voyage` *(default)* | The app, via MongoDB's Atlas Embedding API | `voyage_api_key` | `embedding` (1024 floats) | `vector` |
+| `auto` | Atlas, inside the cluster | nothing | `searchText` (the text itself) | `autoEmbed` |
+| `titan` | The app, via Bedrock Titan v2 | Bedrock model access | `embedding` (1024 floats) | `vector` |
+
+It is a deploy-time choice, not a per-query one: an Atlas index cannot mix `vector`
+and `autoEmbed` fields, so changing your mind means rebuilding the indexes and
+re-running the seed.
+
+The whole difference lives in two mirrored functions in
+[`embeddings.py`](agent/embeddings.py) — `index_fields()` (what the seed writes)
+and `query_clause()` (what the search sends). Everything else is mode-blind.
+[`test_embedding_modes.py`](agent/test_embedding_modes.py) asserts the pair agrees
+on the field name in all three modes, because a mismatch there returns zero
+documents without raising anything.
+
+**`atlas-voyage`** — the app calls the embedding API and stores the vector itself.
+Voyage keys come in two flavours that hit different endpoints, and the prefix
+decides: an `al-…` key is issued by MongoDB Atlas and goes to `ai.mongodb.com`, a
+`pa-…` key is native Voyage and goes to `api.voyageai.com`. Using one against the
+other's endpoint returns `403`. `VOYAGE_API_BASE` overrides the detection.
+
+> **Rate limits are a runtime concern here, not just a seeding one.** A single turn
 > embeds several times — memory recall in the orchestrator, again in the
 > specialist, once per `vector_search`, and once each for the batched message and
 > fact writes. That is roughly 4–6 calls per turn. Seeding batches into one
 > request; live turns cannot. A key rated in the low single-digit requests per
 > minute will `429` mid-conversation, and the answer stalls.
+
+**`auto`** — MongoDB Atlas Automated Embedding. There is no embedding code on the
+path at all: the seed writes the text, the index says which model to use, and
+Atlas embeds both the stored documents and the incoming query string in-cluster.
+
+```javascript
+// seed writes text, not vectors
+{ "type": "autoEmbed", "modality": "text", "path": "searchText", "model": "voyage-4" }
+
+// and the query is a string
+{ "$vectorSearch": { "index": "jobs_vector_index", "path": "searchText",
+                     "query": { "text": "senior backend roles in Berlin" } } }
+```
+
+No key anywhere in the stack, no rate limit to trip, and no way for the stored
+vectors to drift out of sync with the model — Atlas re-embeds on write. The costs:
+it is a **Preview** feature, it needs a dedicated cluster (M10+) with storage
+auto-scaling on (`atlas.tf` enables it), embedding runs on MongoDB infrastructure
+in a US region regardless of where your cluster lives, and generation is
+*asynchronous* — the index reports `READY` before the documents behind it are
+embedded. `seed.py` handles that last one by polling a real `$vectorSearch` until
+it answers, so "the UI is up" still means "the data is searchable".
+
+**`titan`** — Bedrock Titan v2, no account beyond AWS. The fallback for attendees
+who have neither an Atlas model API key nor a Voyage one.
 
 ### Observability, two ways
 
@@ -253,7 +324,9 @@ agent/             one container image for every agent
   tools.py           vector_search, recall_conversation, read_skill_resource
   memory.py          facts, chat messages, sessions, AgentCore short-term
   tracing.py         trace events → stdout (CloudWatch) + Atlas
+  embeddings.py      the three embedding modes, and nothing else knows about them
   test_config.py     self-check for the config-only contract
+  test_embedding_modes.py  self-check that seed and search agree on the index field
 mcp/               official mongodb-mcp-server, packaged for AgentCore Runtime
 seed/              data + embeddings + Atlas index creation (replaces a Bedrock KB)
 ui/app.py          Streamlit — chat, live reasoning, developer trace

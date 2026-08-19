@@ -94,10 +94,11 @@ resource "aws_bedrockagentcore_agent_runtime" "agents" {
       AGENTCORE_MEMORY_ID = aws_bedrockagentcore_memory.short_term.id
       RUNTIME_MAP_PARAM   = local.runtime_map_param
       MONGODB_DB          = var.mongodb_db
+      EMBEDDING_MODE      = var.embedding_mode
+      VOYAGE_EMBED_MODEL  = var.voyage_embed_model
     },
     var.voyage_api_key == "" ? {} : {
-      VOYAGE_API_KEY     = var.voyage_api_key
-      VOYAGE_EMBED_MODEL = var.voyage_embed_model
+      VOYAGE_API_KEY = var.voyage_api_key
     },
   )
 

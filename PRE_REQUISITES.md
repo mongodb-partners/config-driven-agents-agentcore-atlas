@@ -30,31 +30,65 @@ are available there first.
 
 Bedrock console → **Model access** → enable:
 
-- **Anthropic Claude Haiku 4.5** — every agent's model
-- **Amazon Titan Text Embeddings V2** — embeddings for the vector store and memory
+- **Anthropic Claude Haiku 4.5** — every agent's model. Always required.
+- **Amazon Titan Text Embeddings V2** — only if you pick `embedding_mode = "titan"`
+  in [2.3](#23-choose-an-embedding-mode). Enable it anyway; it costs nothing and
+  leaves you a fallback.
 
 Approval is usually instant but is **not** guaranteed to be. Do this first.
 
-> **Using Voyage AI embeddings instead?** Set `voyage_api_key` in
-> `terraform.tfvars` and you can skip Titan. Both are 1024-dim, so the Atlas
-> indexes are identical. Two things to get right:
->
-> **1. There are two kinds of Voyage key, and they are not interchangeable.**
-> The stack detects which you have from its prefix and calls the matching
-> endpoint, so you do not need to configure this — but you do need to know that
-> mixing them up produces a `403`, not a helpful message:
->
-> | Key prefix | Issued by | Endpoint used |
-> |---|---|---|
-> | `al-…` | MongoDB Atlas → model API keys | `https://ai.mongodb.com/v1/embeddings` |
-> | `pa-…` | Voyage AI directly | `https://api.voyageai.com/v1/embeddings` |
->
-> **2. Check the rate limit.** Each agent turn makes 4–6 embedding calls, so a
-> low-tier key (a few requests per minute) returns `429` part-way through a
-> conversation and the answer stalls. A key rated in the hundreds of requests per
-> minute is comfortable. Titan has no such limit at workshop volume.
+### 2.3 Choose an embedding mode
 
-### 2.3 Credentials and permissions
+`./deploy.sh` asks this on the first run and records the answer as
+`embedding_mode` in `terraform.tfvars`. Deciding now saves a restart, because the
+required secret is checked before anything is created.
+
+| Mode | You need | Good when |
+|---|---|---|
+| `atlas-voyage` *(default)* | a Voyage or Atlas model API key | you want the Voyage quality and already have a key |
+| `auto` | nothing | you want the least moving parts, and Preview features are fine |
+| `titan` | Bedrock model access (2.2) | you have no Atlas or Voyage key at all |
+
+#### If you pick `atlas-voyage`
+
+Set `voyage_api_key` in `terraform.tfvars`. Two things to get right:
+
+**1. There are two kinds of Voyage key, and they are not interchangeable.**
+The stack detects which you have from its prefix and calls the matching
+endpoint, so you do not need to configure this — but you do need to know that
+mixing them up produces a `403`, not a helpful message:
+
+| Key prefix | Issued by | Endpoint used |
+|---|---|---|
+| `al-…` | MongoDB Atlas → model API keys | `https://ai.mongodb.com/v1/embeddings` |
+| `pa-…` | Voyage AI directly | `https://api.voyageai.com/v1/embeddings` |
+
+**2. Check the rate limit.** Each agent turn makes 4–6 embedding calls, so a
+low-tier key (a few requests per minute) returns `429` part-way through a
+conversation and the answer stalls. A key rated in the hundreds of requests per
+minute is comfortable. Titan has no such limit at workshop volume, and `auto`
+makes no API call from your side at all.
+
+#### If you pick `auto`
+
+Nothing to obtain — MongoDB Atlas generates the embeddings inside the cluster and
+bills them to your Atlas account. Four things to know before you choose it:
+
+- **It is a Preview feature.** Fine for a workshop, not for production.
+- **Dedicated cluster only.** `atlas_cluster_tier` must be `M10` or larger (it is
+  by default) with storage auto-scaling on — `atlas.tf` enables it, because a full
+  disk pauses embedding generation and marks the index `Stale`.
+- **Model choice is narrower**: `voyage-4` (default), `voyage-4-large`,
+  `voyage-4-lite`, or `voyage-code-3`. Terraform rejects anything else up front.
+- **Embedding runs on MongoDB's inference infrastructure in a US region**,
+  wherever your cluster lives, and your text is sent there. Data transfer costs
+  apply.
+
+Seeding takes a few minutes longer in this mode: Atlas embeds the corpus
+asynchronously after the index is built, and `seed.py` waits for a real query to
+come back before it lets the UI start.
+
+### 2.4 Credentials and permissions
 
 Configure a profile that works from your terminal:
 
@@ -67,7 +101,7 @@ The identity needs the permissions in [`iam-permissions.json`](iam-permissions.j
 Attach it as an inline or managed policy. `AdministratorAccess` also works if
 that is what your account gives you.
 
-### 2.4 If your account is in a governed AWS Organization
+### 2.5 If your account is in a governed AWS Organization
 
 Some organizations enforce a Bedrock **guardrail policy** across member accounts. When they
 do, AWS applies a guardrail owned by another account to every `Converse` call, and the
@@ -85,7 +119,7 @@ What it does **not** work around is a guardrail that *blocks* your content — t
 a refusal in the agent's answer, not an IAM error. If that happens, the guardrail belongs to
 your org's security team, not to this stack.
 
-### 2.5 Service quotas
+### 2.6 Service quotas
 
 Defaults are fine for a fresh account. Check only if yours is heavily used:
 
@@ -97,7 +131,46 @@ Defaults are fine for a fresh account. Check only if yours is heavily used:
 
 ## 3. MongoDB Atlas setup
 
+You have two options. Read 3.0 first — it decides whether you need 3.1–3.3 at all.
+
+### 3.0 New cluster, or one you already have?
+
+| | Terraform creates it *(default)* | You bring one (`mongodb_uri`) |
+|---|---|---|
+| Setup | API key + org ID (3.1, 3.2) | a connection string |
+| Deploy time | 15–20 min | 8–12 min |
+| Cost | ~USD 0.11/hour while it runs | whatever your cluster already costs |
+| `destroy` | removes the project and all data | leaves your cluster untouched |
+| Good for | first run, clean slate per attendee | re-running the workshop, or an existing dev cluster |
+
+**Bringing your own** — set one line in `terraform.tfvars` and skip 3.1–3.3:
+
+```hcl
+mongodb_uri = "mongodb+srv://user:password@cluster.abcde.mongodb.net/"
+```
+
+Terraform then creates no Atlas resources at all, so four things become yours to
+get right — `./deploy.sh` prints this list back at you before deploying:
+
+- **Network access.** The Atlas project must allow the AgentCore runtimes and the
+  EC2 instance in. Those have no fixed egress IPs, so `0.0.0.0/0` is what the
+  managed path uses. Atlas → Network Access → Add IP Address.
+- **A database user** with `readWrite` on your `mongodb_db` **and** `atlasAdmin`
+  on `admin`. The seed creates Atlas Search indexes, which `readWrite` alone
+  cannot do. Put its username and password in the URI.
+- **Tier.** The stack builds 7 vector indexes, so M0 (limit 3) will not work.
+  `embedding_mode = "auto"` additionally needs M10+ with storage auto-scaling on.
+- **The data.** The seed upserts into the `mongodb_db` database (`riv_workshop`
+  by default) and touches nothing else. `destroy` leaves all of it in place —
+  drop that database by hand if you want it gone.
+
+> Switching `mongodb_uri` on/off between runs of an already-deployed stack means
+> Terraform destroys the managed cluster, or builds a new one. Decide before the
+> first `apply`, not after.
+
 ### 3.1 API key
+
+*Skip 3.1–3.3 if you set `mongodb_uri`.*
 
 Atlas → **Organization** → **Access Manager** → **API Keys** → **Create API Key**
 
@@ -112,7 +185,8 @@ Atlas → **Organization Settings** — copy the ID (24 hex characters).
 
 The stack creates an **M10** cluster, roughly **USD 0.11/hour**. Your org needs a
 payment method on file. The free M0 tier will not work: it allows three Atlas
-Search indexes and this stack needs seven.
+Search indexes and this stack needs seven. (With `mongodb_uri` set, none of this
+applies — you are already paying for whatever you brought.)
 
 **Run `./deploy.sh destroy` when you are finished.**
 
@@ -214,4 +288,6 @@ Assume a 4-hour workshop, then destroyed:
 | **Total** | **well under USD 5** |
 
 Leaving it running costs roughly **USD 3/day**, almost all of it the Atlas
-cluster. `./deploy.sh destroy` removes everything, including the Atlas project.
+cluster. `./deploy.sh destroy` removes everything, including the Atlas project —
+unless you set `mongodb_uri`, in which case your cluster and its data survive and
+the AWS side of the bill is pennies.

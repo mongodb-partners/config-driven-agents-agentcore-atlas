@@ -170,7 +170,7 @@ def find(collection: str, filter: dict, limit: int = 10, projection: dict | None
         collection=collection,
         filter=filter,
         limit=limit,
-        projection=projection or {"embedding": 0},
+        projection=projection or {embeddings.VECTOR_FIELD: 0, embeddings.AUTO_FIELD: 0},
     )
     return docs if isinstance(docs, list) else [docs]
 
@@ -182,22 +182,24 @@ def insert(collection: str, documents: list[dict]) -> None:
 
 def vector_search(
     collection: str,
-    query_vector: list[float],
+    query_text: str,
     limit: int = 5,
     filter: dict | None = None,
     num_candidates: int | None = None,
 ) -> list[dict]:
     """`$vectorSearch` through the MCP `aggregate` tool.
 
-    The 1024-float vector is built here and passed straight to MCP, so it never
-    passes through a model's context window.
+    Takes text, never a vector — which side embeds it is the deploy-time
+    decision in `embeddings.MODE`, and no caller needs to know. In the API modes
+    the 1024 floats are built here and handed straight to MCP, so they never
+    pass through a model's context window. In `auto` mode there is no vector on
+    this side at all: Atlas embeds the query string inside the cluster.
     """
     stage: dict[str, Any] = {
         "index": f"{collection}_vector_index",
-        "path": "embedding",
-        "queryVector": query_vector,
         "numCandidates": num_candidates or max(limit * 15, 100),
         "limit": limit,
+        **embeddings.query_clause(query_text),
     }
     if filter:
         stage["filter"] = filter
@@ -206,7 +208,7 @@ def vector_search(
     pipeline = [
         {"$vectorSearch": stage},
         {"$set": {"score": {"$meta": "vectorSearchScore"}}},
-        {"$unset": ["embedding", "_id"]},
+        {"$unset": [embeddings.VECTOR_FIELD, embeddings.AUTO_FIELD, "_id"]},
     ]
     docs = call("aggregate", collection=collection, pipeline=pipeline)
     return docs if isinstance(docs, list) else [docs]

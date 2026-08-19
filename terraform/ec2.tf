@@ -153,6 +153,7 @@ resource "aws_instance" "ui" {
     orchestrator_log_group = "/aws/bedrock-agentcore/runtimes/${aws_bedrockagentcore_agent_runtime.agents[local.orchestrator_id].agent_runtime_id}-DEFAULT"
     mongodb_db             = var.mongodb_db
     mongodb_secret_arn     = aws_secretsmanager_secret.mongodb_uri.arn
+    embedding_mode         = var.embedding_mode
     voyage_api_key         = var.voyage_api_key
     voyage_embed_model     = var.voyage_embed_model
   })
