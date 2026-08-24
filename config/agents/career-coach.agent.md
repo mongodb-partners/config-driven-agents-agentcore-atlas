@@ -11,6 +11,10 @@ description: >-
 role: specialist
 model: us.anthropic.claude-haiku-4-5-20251001-v1:0
 maxTokens: 4096
+# Extended thinking. This is what fills the UI's reasoning panel — with no
+# budget Bedrock streams no reasoning at all. Costs thinking tokens as output
+# and forces temperature to 1.0. Set to false to turn the panel off again.
+thinking: 1024
 temperature: 0.3
 skills:
   - career-coach

@@ -116,6 +116,36 @@ def test_a_new_agent_needs_no_code_change():
             agent_config.CONFIG_DIR = original
 
 
+def test_thinking_budget_must_leave_room_for_the_answer():
+    """A budget at or above maxTokens is a Bedrock ValidationException on the
+    first turn after a deploy — catch it here, where it costs nothing."""
+    ok = agent_config._thinking_budget({"id": "x", "thinking": 1024, "maxTokens": 4096})
+    assert ok == 1024, ok
+
+    for bad in ({"id": "x", "thinking": 4096, "maxTokens": 4096},   # no room left
+                {"id": "x", "thinking": 512, "maxTokens": 4096}):   # under the floor
+        try:
+            agent_config._thinking_budget(bad)
+        except ValueError:
+            continue
+        raise AssertionError(f"accepted an unusable thinking budget: {bad}")
+
+
+def test_thinking_is_off_unless_asked_for():
+    """No reasoning stream is the default: it costs output tokens every turn."""
+    assert agent_config._thinking_budget({"id": "x", "maxTokens": 4096}) == 0
+    assert agent_config._thinking_budget({"id": "x", "thinking": False}) == 0
+    assert agent_config._thinking_budget({"id": "x", "thinking": True}) == 1024
+
+
+def test_every_shipped_agent_streams_reasoning():
+    """The UI's reasoning panel is empty for any agent that skips this."""
+    for agent in agent_config.load_roster() + [{"id": "orchestrator"}]:
+        d = agent_config.load_agent(agent["id"])
+        assert d.thinking_budget >= 1024, f"{d.id} has no thinking budget"
+        assert d.max_tokens > d.thinking_budget, f"{d.id} left no room for the answer"
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

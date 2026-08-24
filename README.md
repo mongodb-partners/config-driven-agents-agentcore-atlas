@@ -10,7 +10,7 @@ config, never code.**
 ```mermaid
 flowchart TB
     browser(["Browser"])
-    ui["<b>Streamlit UI</b> · EC2 t4g.small<br/>chat · live reasoning · developer trace"]
+    ui["<b>Streamlit UI</b> · EC2 t4g.small<br/>chat · live reasoning<br/>developer trace · live metrics"]
 
     subgraph ac["Amazon Bedrock AgentCore — 5 runtimes, 5 IAM roles"]
         orch["<b>orchestrator</b><br/>routes · owns memory"]
@@ -129,6 +129,26 @@ for 7 vector indexes. `deploy.sh` prints that list before it starts, and
 [PRE_REQUISITES §3.0](PRE_REQUISITES.md#30-new-cluster-or-one-you-already-have)
 has the detail.
 
+### Run the UI locally
+
+The agents live in AgentCore, so nothing about them runs on your laptop. The UI
+is the exception, and it is the part you are most likely to change:
+
+```bash
+./run-local.sh          # http://localhost:8501
+```
+
+It reads the runtime ARNs and the database out of Terraform state, reuses the
+repo's `.venv`, and serves `ui/app.py` against the deployed stack. Edit the file
+and Streamlit reloads. It needs live AWS credentials — the UI signs its calls to
+the orchestrator with them — and an Atlas network access rule that admits your
+laptop, so it stops with a clear message rather than a stack trace if either is
+missing.
+
+Anything under `agent/`, `config/`, `mcp/` or `seed/` still needs `./deploy.sh`:
+that code runs in the runtimes, not locally, and a trace panel that looks wrong
+locally is usually a deployed agent that has not been rebuilt yet.
+
 ---
 
 ## Add an agent without touching code
@@ -146,6 +166,7 @@ description: >-
 role: specialist
 model: us.anthropic.claude-haiku-4-5-20251001-v1:0
 maxTokens: 4096
+thinking: 1024
 temperature: 0.4
 skills: []
 collections:
@@ -203,6 +224,17 @@ not given.
 
 [`agent/main.py`](agent/main.py) is one image for all of them; `AGENT_ID` decides
 which definition the container becomes.
+
+`thinking:` is the one key with consequences beyond its own agent. It sets the
+extended-thinking budget, and extended thinking is the only thing that makes
+Bedrock stream `reasoningContent` — with no budget the UI's reasoning panel is
+structurally empty, however fast the transport is. Two constraints come with it,
+both enforced at config load rather than as a runtime `ValidationException`: the
+budget must be at least 1024 and must leave room under `maxTokens` for the
+answer. Bedrock also rejects any temperature but 1.0 alongside thinking, so
+`build_model()` overrides `temperature:` while a budget is set. Thinking tokens
+are billed as output on every turn — `thinking: false` turns an agent's reasoning
+stream back off.
 
 ### Atlas does four jobs
 
@@ -307,9 +339,52 @@ who have neither an Atlas model API key nor a Voyage one.
   behaviour with an aggregation pipeline instead of CloudWatch Insights. This is
   what the UI's **Developer trace** panel reads.
 
-The panel shows four things and nothing else: the ordered flow with timings, the
-Atlas calls with their inputs and result previews, what memory was recalled and
-written, and the raw events.
+The panel has five tabs and nothing else: **Flow** (every step in order, with the
+offset from turn start), **Tokens & cost**, **Atlas calls** (each query with its
+arguments and a result preview), **Memory** (what was recalled and written), and
+**Raw events**.
+
+### What a turn costs, and where the context went
+
+One turn is never one model call. A typical turn makes three: the orchestrator's
+routing call, the specialist's answer, and a fact-extraction call that runs after
+the answer has streamed — no latency, full price. **Tokens & cost** lists them
+separately, with input, output and cached tokens per call, so the third one is
+visible rather than folded into a total.
+
+Two numbers in that tab are measured differently, and the tab says so:
+
+- **Tokens and cost** come from the API's own usage figures. Cache reads bill at
+  0.1× and writes at 1.25×, and are counted apart from uncached input.
+- **What filled the context window** is measured in *characters*. The API bills a
+  single `inputTokens` figure and will not break it down, so
+  [`build_system_prompt`](agent/main.py) reports the size of each segment as it
+  assembles the prompt — agent prompt, specialist roster, skill docs, session
+  history, recalled memory — and the turn adds the tool results it read and the
+  candidate's own message alongside them. The token column is that character
+  count divided by four: a ratio, not a measurement. It is there to answer "why
+  is this prompt so large", and the answer is usually skill docs, by an order of
+  magnitude over recalled memory.
+
+Prices live in a table in [`tracing.py`](agent/tracing.py) and are **Anthropic's
+published list prices**, not Bedrock's — Bedrock is partner-operated and bills
+separately. Confirm them against the Bedrock pricing page before quoting a figure.
+`MODEL_PRICING` overrides the table as JSON without a rebuild, and a model the
+table does not know prices at zero rather than guessing.
+
+### Live metrics, in the sidebar
+
+The sidebar totals every turn the user has ever run: total tokens, cost, and
+per-request averages for latency, tool calls, tokens and LLM calls. It is one
+aggregation over `agent_traces`, recomputed on each script run — refresh the page
+to update it, there is no live stream.
+
+The join is the interesting part. The orchestrator and the specialist run in
+separate runtimes and flush separate trace documents, so counting documents would
+report double the requests and half the tokens per request. The orchestrator
+passes its `traceId` down and the specialist stores it as `parentTraceId`: tokens
+sum across both, while the request count and the latency come from root traces
+only.
 
 ---
 
@@ -327,12 +402,17 @@ agent/             one container image for every agent
   embeddings.py      the three embedding modes, and nothing else knows about them
   test_config.py     self-check for the config-only contract
   test_embedding_modes.py  self-check that seed and search agree on the index field
+  test_pricing.py    self-check for the cost arithmetic
+  test_tool_trace.py self-check that a tool call is traced with its arguments
 mcp/               official mongodb-mcp-server, packaged for AgentCore Runtime
 seed/              data + embeddings + Atlas index creation (replaces a Bedrock KB)
-ui/app.py          Streamlit — chat, live reasoning, developer trace
+ui/
+  app.py             Streamlit — chat, live reasoning, developer trace, live metrics
+  .streamlit/config.toml   the MongoDB design system as native Streamlit theming
 terraform/         the whole stack
 scripts/           build-and-push.sh — ARM64 build + ECR push, called by Terraform
 deploy.sh          one command up, one command down
+run-local.sh       serve the UI from your laptop against the deployed stack
 ```
 
 ---
@@ -369,6 +449,17 @@ db.agent_traces.aggregate([
   { $match: { "events.kind": "tool.call" } },
   { $group: { _id: "$events.tool", calls: { $sum: 1 } } }
 ])
+
+// tokens and cost per agent, across every turn
+db.agent_traces.aggregate([
+  { $unwind: "$events" },
+  { $match: { "events.kind": "usage" } },
+  { $group: {
+      _id: "$agentId",
+      calls:  { $sum: 1 },
+      tokens: { $sum: "$events.totalTokens" },
+      usd:    { $sum: "$events.costUsd" } } }
+])
 ```
 
 ---
@@ -389,6 +480,10 @@ Deliberate, and marked `ponytail:` in the source where they are load-bearing.
 - **Agents read; the framework writes.** Only read tools are exposed to the models.
   Memory and trace writes go through MCP from framework code, so an agent cannot
   corrupt its own history.
+- **The cost figure is an estimate.** It is computed from a price table in
+  `tracing.py` holding Anthropic's published list prices, not rates read from
+  AWS. Bedrock bills separately, so treat the number as an order of magnitude
+  and a way to compare turns against each other — not as your invoice.
 - **`user_id` is a fixed string.** With no auth there is no real identity, so
   long-term memory is shared across every session on a deployment. That makes the
   memory demo work; it is not a multi-tenant design.

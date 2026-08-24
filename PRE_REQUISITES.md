@@ -200,6 +200,12 @@ applies — you are already paying for whatever you brought.)
 | Docker | with `buildx` | `docker buildx version` |
 | AWS CLI | v2 | `aws --version` |
 | git | any | `git --version` |
+| Python | 3.11 | `python3 --version` |
+
+Python is not needed to deploy — the agent code runs in containers and the UI
+runs on the EC2 box. It is only needed if you want to run the UI on your own
+machine against the deployed stack (`./run-local.sh`), or run the `agent/test_*.py`
+self-checks.
 
 ### Docker must be running and able to build ARM64
 
@@ -258,6 +264,7 @@ terraform version | head -1
 docker buildx version
 docker info > /dev/null && echo "docker: running"
 aws --version
+python3 --version
 aws sts get-caller-identity --query Arn --output text
 
 REGION=us-east-1
@@ -286,6 +293,13 @@ Assume a 4-hour workshop, then destroyed:
 | Bedrock (Haiku + Titan) | under USD 1 for a few dozen conversations |
 | ECR, S3, Secrets Manager, CloudWatch | pennies |
 | **Total** | **well under USD 5** |
+
+Every agent ships with an extended-thinking budget, because that is what produces
+the reasoning stream the UI shows. Thinking tokens are billed as output — the
+most expensive kind — so a workshop's Bedrock line is larger than the token count
+of the visible answers suggests. `thinking: false` in an agent's frontmatter turns
+it off. The UI's own cost meter uses Anthropic's published list prices rather than
+Bedrock's, so use it to compare turns, not to predict the invoice.
 
 Leaving it running costs roughly **USD 3/day**, almost all of it the Atlas
 cluster. `./deploy.sh destroy` removes everything, including the Atlas project —

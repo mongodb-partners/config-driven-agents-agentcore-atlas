@@ -22,6 +22,10 @@ atlas_private_key = "REPLACE_ME"
 #
 # mongodb_uri = "mongodb+srv://user:password@cluster.abcde.mongodb.net/"
 
+# The database the seed writes into, under either option. The seed upserts and
+# touches nothing else, so an existing cluster can host it alongside your data.
+mongodb_db = "riv_workshop"
+
 # ── Optional ──────────────────────────────────────────────────────────────────
 
 # Must have Bedrock AgentCore and Claude Haiku 4.5 enabled — plus Titan Embed v2
@@ -62,6 +66,11 @@ voyage_api_key = ""
 #                 voyage-3, voyage-3-large
 #   auto:         voyage-4, voyage-4-large, voyage-4-lite, voyage-code-3
 voyage_embed_model = "voyage-4"
+
+# Graviton, to match the ARM64 agent images. If apply fails the precondition in
+# ec2.tf, no subnet in the default VPC sits in an AZ offering this type — try
+# t4g.medium or m7g.medium, or another aws_region.
+ec2_instance_type = "t4g.small"
 
 # Narrow this to your own IP/32 if your network allows it.
 ui_allowed_cidr = "0.0.0.0/0"

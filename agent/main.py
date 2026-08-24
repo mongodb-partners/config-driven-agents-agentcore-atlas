@@ -105,30 +105,69 @@ def _history_block(turns: list[dict]) -> str:
     return "\n\n## This session so far\n\n" + "\n".join(lines)
 
 
-def build_system_prompt(facts: list[dict], turns: list[dict]) -> str:
+def build_system_prompt(facts: list[dict], turns: list[dict]) -> tuple[str, dict[str, int]]:
+    """Assemble the system prompt, and report the size of each part that went in.
+
+    The API bills one `inputTokens` figure for the whole request, so it cannot
+    tell an attendee *why* their prompt is large. The character counts here can:
+    they are measured, not estimated, and they are usually enough to see that the
+    skill docs dwarf everything else.
+    """
     parts = [AGENT.system_prompt]
+    sizes = {"agentPrompt": len(AGENT.system_prompt)}
 
     if AGENT.role == "orchestrator":
         roster = agent_config.load_roster()
         cards = "\n\n".join(
             f"### `{a['id']}` — {a['name']}\n{a['description']}" for a in roster
         )
-        parts.append(f"\n\n## Available specialists\n\n{cards}")
+        block = f"\n\n## Available specialists\n\n{cards}"
+        parts.append(block)
+        sizes["specialistRoster"] = len(block)
     else:
-        for name, doc in AGENT.skill_docs.items():
-            parts.append(f"\n\n---\n\n# Skill: {name}\n\n{doc}")
+        skills = "".join(
+            f"\n\n---\n\n# Skill: {name}\n\n{doc}"
+            for name, doc in AGENT.skill_docs.items()
+        )
+        parts.append(skills)
+        sizes["skillDocs"] = len(skills)
 
-    parts.append(_history_block(turns))
-    parts.append(_facts_block(facts))
-    return "".join(parts)
+    history = _history_block(turns)
+    parts.append(history)
+    sizes["sessionHistory"] = len(history)
+
+    # Everything recalled from Atlas that rides along in every request.
+    memory_block = _facts_block(facts)
+    parts.append(memory_block)
+    sizes["atlasMemory"] = len(memory_block)
+
+    return "".join(parts), sizes
 
 
 def build_model() -> BedrockModel:
+    """The model for this agent, with extended thinking if the definition asks.
+
+    Thinking is what produces the reasoning stream: without a budget Bedrock
+    sends no reasoningContent deltas, Strands emits no `reasoningText`, and the
+    UI's reasoning panel stays empty no matter how fast the transport is.
+    """
+    if not AGENT.thinking_budget:
+        return BedrockModel(
+            model_id=AGENT.model,
+            region_name=REGION,
+            max_tokens=AGENT.max_tokens,
+            temperature=AGENT.temperature,
+        )
     return BedrockModel(
         model_id=AGENT.model,
         region_name=REGION,
         max_tokens=AGENT.max_tokens,
-        temperature=AGENT.temperature,
+        # Not AGENT.temperature: Bedrock rejects any other value alongside
+        # thinking. Sampling is fixed at 1.0 whenever the budget is set.
+        temperature=1.0,
+        additional_request_fields={
+            "thinking": {"type": "enabled", "budget_tokens": AGENT.thinking_budget}
+        },
     )
 
 
@@ -146,18 +185,28 @@ async def stream_agent(agent: Agent, prompt: str, tr: Trace):
         if reasoning := (event.get("reasoningText") or event.get("reasoning_text")):
             yield {"type": "reasoning", "agentId": AGENT.id, "text": reasoning}
 
-        use = event.get("current_tool_use") or {}
-        use_id = use.get("toolUseId")
-        if use_id and use_id not in seen_tools and use.get("name"):
-            seen_tools.add(use_id)
-            yield {"type": "trace", **tr.event(
-                "tool.call", tool=use["name"], toolUseId=use_id,
-                input=str(use.get("input"))[:2000],
-            )}
-
+        # Both halves of a tool call come off `message`, not `current_tool_use`.
+        # That mid-stream dict starts life with input="" and grows one JSON
+        # fragment per delta, so reading it on first sight — which is what any
+        # dedupe by toolUseId does — captures the empty string every time. The
+        # message carries the arguments already parsed, and for the model's own
+        # message it arrives before the tool runs, so the step is still live.
         message = event.get("message") or {}
         for block in message.get("content", []) or []:
-            result = block.get("toolResult") if isinstance(block, dict) else None
+            if not isinstance(block, dict):
+                continue
+
+            use = block.get("toolUse")
+            if use and (use_id := use.get("toolUseId")) and use_id not in seen_tools:
+                seen_tools.add(use_id)
+                yield {"type": "trace", **tr.event(
+                    "tool.call", tool=use.get("name"), toolUseId=use_id,
+                    # dumps, not str: the panel renders this as JSON, and a
+                    # Python repr of a dict is not JSON.
+                    input=json.dumps(use.get("input"), default=str)[:2000],
+                )}
+
+            result = block.get("toolResult")
             if not result:
                 continue
             body = " ".join(
@@ -203,7 +252,8 @@ def _sse_events(body):
             yield {"type": "delta", "text": payload}
 
 
-def invoke_specialist(agent_id: str, prompt: str, session_id: str, user_id: str):
+def invoke_specialist(agent_id: str, prompt: str, session_id: str, user_id: str,
+                      parent_trace_id: str = ""):
     # ponytail: sync generator inside the async path — iter_lines blocks the event
     # loop. Fine at workshop scale (one attendee, one stack, one conversation).
     # Move to httpx.AsyncClient if this ever serves concurrent sessions.
@@ -219,6 +269,7 @@ def invoke_specialist(agent_id: str, prompt: str, session_id: str, user_id: str)
         qualifier="DEFAULT",
         payload=json.dumps({
             "prompt": prompt, "sessionId": session_id, "userId": user_id,
+            "parentTraceId": parent_trace_id,
         }).encode(),
     )
     yield from _sse_events(resp["response"])
@@ -241,17 +292,34 @@ async def run_orchestrator(prompt: str, session_id: str, user_id: str, tr: Trace
         )}
 
     state: dict = {}
+    system_prompt, prompt_sizes = build_system_prompt(facts, turns)
     orchestrator = Agent(
         model=build_model(),
-        system_prompt=build_system_prompt(facts, turns),
+        system_prompt=system_prompt,
         tools=[_handoff_tool(state)],
         callback_handler=None,
     )
 
-    # Routing is one short classification call — streaming it would show the
-    # candidate nothing useful, so we run it to completion and stream the
-    # specialist instead.
-    result = await orchestrator.invoke_async(prompt)
+    # Routing is one short classification call, but it is also the whole wait
+    # before a specialist exists to stream anything — run to completion it is
+    # several seconds of blank UI. Streamed, its reasoning and its handoff tool
+    # call reach the candidate as they happen. The text is buffered rather than
+    # forwarded: if a specialist takes over, this agent's words are not the
+    # answer, and appending them would prepend routing chatter to the response.
+    direct = ""
+    async for event in stream_agent(orchestrator, prompt, tr):
+        if event.get("type") == "delta":
+            direct += event.get("text", "")
+            continue
+        yield event
+
+    metrics = orchestrator.event_loop_metrics
+    yield {"type": "trace", **tr.usage(
+        "route", AGENT.model, metrics.accumulated_usage,
+        latencyMs=metrics.accumulated_metrics.get("latencyMs", 0),
+        cycles=metrics.cycle_count,
+        promptChars=prompt_sizes, userPromptChars=len(prompt),
+    )}
 
     answer = ""
     if target := state.get("agentId"):
@@ -261,12 +329,12 @@ async def run_orchestrator(prompt: str, session_id: str, user_id: str, tr: Trace
         yield {"type": "agent", "agentId": target}
 
         brief = f"{state.get('summary', '')}\n\nCandidate's message: {prompt}"
-        for event in invoke_specialist(target, brief, session_id, user_id):
+        for event in invoke_specialist(target, brief, session_id, user_id, tr.trace_id):
             if event.get("type") == "delta":
                 answer += event.get("text", "")
             yield event
     else:
-        answer = str(result)
+        answer = direct
         yield {"type": "trace", **tr.event("route", to=None, reason="no specialist matched")}
         yield {"type": "delta", "agentId": AGENT.id, "text": answer}
 
@@ -281,10 +349,15 @@ async def run_orchestrator(prompt: str, session_id: str, user_id: str, tr: Trace
         yield {"type": "trace", **tr.event(
             "memory.write", collection="chat_messages", count=written)}
 
-        stored = memory.extract_facts(user_id, session_id, prompt, answer)
+        stored, extract_usage = memory.extract_facts(user_id, session_id, prompt, answer)
         yield {"type": "trace", **tr.event(
             "memory.extract", collection="agent_facts", count=len(stored),
             facts=[f["text"] for f in stored],
+        )}
+        # Easy to forget this one: it runs after the answer has already streamed,
+        # so it costs the candidate no latency but every bit as much money.
+        yield {"type": "trace", **tr.usage(
+            "memory.extract", memory.EXTRACTION_MODEL, extract_usage,
         )}
 
     if AGENT.short_term and answer.strip():
@@ -309,14 +382,28 @@ async def run_specialist(prompt: str, session_id: str, user_id: str, tr: Trace):
         collections=AGENT.collections,
     )}
 
+    system_prompt, prompt_sizes = build_system_prompt(facts, [])
     specialist = Agent(
         model=build_model(),
-        system_prompt=build_system_prompt(facts, []),
+        system_prompt=system_prompt,
         tools=built,
         callback_handler=None,
     )
     async for event in stream_agent(specialist, prompt, tr):
         yield event
+
+    # Only complete once the stream has drained — Strands accumulates usage
+    # across every cycle of the loop, including the ones spent on tool calls.
+    m = specialist.event_loop_metrics
+    yield {"type": "trace", **tr.usage(
+        "answer", AGENT.model, m.accumulated_usage,
+        latencyMs=m.accumulated_metrics.get("latencyMs", 0),
+        cycles=m.cycle_count,
+        promptChars=prompt_sizes, userPromptChars=len(prompt),
+        toolResultChars=sum(
+            e.get("resultChars", 0) for e in tr.events if e.get("kind") == "tool.result"
+        ),
+    )}
 
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────
@@ -336,7 +423,8 @@ async def invoke(payload: dict):
         yield {"type": "error", "message": "payload.prompt is required"}
         return
 
-    tr = Trace(AGENT.id, session_id, user_id)
+    tr = Trace(AGENT.id, session_id, user_id,
+               parent_trace_id=(payload or {}).get("parentTraceId", ""))
     agent_tools.ctx.set({"userId": user_id, "sessionId": session_id})
     yield {"type": "trace", **tr.event(
         "turn.start", role=AGENT.role, model=AGENT.model, promptChars=len(prompt)
