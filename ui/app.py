@@ -30,6 +30,18 @@ LOG_GROUP = os.environ.get("AGENT_LOG_GROUP", "")
 
 st.set_page_config(page_title="Multi-Agent RIV Workshop", layout="wide")
 
+# ── MongoDB design system ─────────────────────────────────────────────────────
+# Palette, type scale and the Euclid / Value Serif / Source Code Pro faces are
+# all in .streamlit/config.toml. Two LeafyGreen rules have no config equivalent:
+# H1 and H2 are green.dark2 (gray.light2 in dark mode), and the serif face stops
+# at H2 — H3 down is Euclid.
+st.html(
+    "<style>"
+    "h1,h2{color:%s}"
+    "h3,h4,h5,h6{font-family:'Euclid Circular A',Helvetica,Arial,sans-serif}"
+    "</style>" % ("#E8EDEB" if st.context.theme.type == "dark" else "#00684A")
+)
+
 
 # ── Connections ───────────────────────────────────────────────────────────────
 
