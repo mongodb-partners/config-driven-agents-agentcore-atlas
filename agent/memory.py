@@ -92,8 +92,14 @@ CANDIDATE: %s
 ASSISTANT: %s"""
 
 
-def extract_facts(user_id: str, session_id: str, user_text: str, assistant_text: str) -> list[dict]:
-    """LLM-extract durable facts and persist them. Returns what was stored."""
+def extract_facts(user_id: str, session_id: str, user_text: str,
+                  assistant_text: str) -> tuple[list[dict], dict]:
+    """LLM-extract durable facts and persist them.
+
+    Returns what was stored, plus the call's token usage — this is a second model
+    call hiding behind a memory write, and a cost dashboard that ignores it
+    under-reports every turn.
+    """
     resp = _bedrock_client().converse(
         modelId=EXTRACTION_MODEL,
         messages=[{"role": "user", "content": [
@@ -101,14 +107,15 @@ def extract_facts(user_id: str, session_id: str, user_text: str, assistant_text:
         ]}],
         inferenceConfig={"maxTokens": 800, "temperature": 0.0},
     )
+    usage = resp.get("usage", {})
     raw = resp["output"]["message"]["content"][0]["text"]
     start, end = raw.find("{"), raw.rfind("}")
     if start == -1 or end == -1:
-        return []
+        return [], usage
     try:
         facts = json.loads(raw[start:end + 1]).get("facts", [])
     except json.JSONDecodeError:
-        return []
+        return [], usage
 
     kept = [
         ((f.get("text") or "").strip(), f.get("kind", "context"))
@@ -116,7 +123,7 @@ def extract_facts(user_id: str, session_id: str, user_text: str, assistant_text:
         if (f.get("text") or "").strip()
     ]
     if not kept:
-        return []
+        return [], usage
 
     # One embedding call for all facts, not one per fact — each round trip is a
     # rate-limit opportunity, and they are all available at once. In auto mode
@@ -134,7 +141,7 @@ def extract_facts(user_id: str, session_id: str, user_text: str, assistant_text:
         for (text, kind), field in zip(kept, fields)
     ]
     mongo_mcp.insert("agent_facts", docs)
-    return [{"text": d["text"], "kind": d["kind"]} for d in docs]
+    return [{"text": d["text"], "kind": d["kind"]} for d in docs], usage
 
 
 def recall_facts(user_id: str, query_text: str, limit: int = 6) -> list[dict]:

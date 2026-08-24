@@ -17,6 +17,11 @@ import yaml
 CONFIG_DIR = Path(os.environ.get("CONFIG_DIR", "/app/config"))
 
 
+# Bedrock rejects a thinking budget under 1024 tokens.
+_MIN_THINKING_BUDGET = 1024
+_DEFAULT_THINKING_BUDGET = 1024
+
+
 @dataclass
 class AgentDef:
     id: str
@@ -30,6 +35,9 @@ class AgentDef:
     collections: list[str]
     short_term: bool
     long_term: bool
+    # 0 means no extended thinking, and therefore no reasoning stream: Bedrock
+    # only emits reasoningContent deltas when a thinking budget is set.
+    thinking_budget: int
     system_prompt: str
     skill_docs: dict[str, str] = field(default_factory=dict)
 
@@ -46,6 +54,32 @@ def _load_skill(skill: str) -> str:
     if not path.exists():
         raise FileNotFoundError(f"agent references unknown skill '{skill}' ({path})")
     return path.read_text()
+
+
+def _thinking_budget(meta: dict) -> int:
+    """Tokens the model may spend thinking out loud, from `thinking:` frontmatter.
+
+    `thinking: true` takes the default; a number sets the budget explicitly.
+    Bedrock requires at least 1024, and requires the budget to leave room for the
+    answer — so a budget that would crowd out maxTokens is an error here rather
+    than a ValidationException on the first turn after a deploy.
+    """
+    raw = meta.get("thinking", False)
+    if raw is False or raw is None:
+        return 0
+    budget = _DEFAULT_THINKING_BUDGET if raw is True else int(raw)
+    max_tokens = int(meta.get("maxTokens", 4096))
+    if budget < _MIN_THINKING_BUDGET:
+        raise ValueError(
+            f"{meta['id']}: thinking budget {budget} is below the Bedrock minimum "
+            f"of {_MIN_THINKING_BUDGET}"
+        )
+    if budget >= max_tokens:
+        raise ValueError(
+            f"{meta['id']}: thinking budget {budget} leaves nothing for the answer "
+            f"— raise maxTokens above it (currently {max_tokens})"
+        )
+    return budget
 
 
 def load_agent(agent_id: str) -> AgentDef:
@@ -67,6 +101,7 @@ def load_agent(agent_id: str) -> AgentDef:
         collections=meta.get("collections") or [],
         short_term=bool(memory.get("shortTerm", False)),
         long_term=bool(memory.get("longTerm", False)),
+        thinking_budget=_thinking_budget(meta),
         system_prompt=body,
         skill_docs={s: _load_skill(s) for s in skills},
     )
