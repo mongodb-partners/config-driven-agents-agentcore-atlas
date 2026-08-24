@@ -1,0 +1,163 @@
+# MongoDB LeafyGreen design system — https://www.mongodb.design
+#
+# Values are the published tokens, not eyeballed approximations:
+#   colours    @leafygreen-ui/palette      (palette.ts)
+#   type scale @leafygreen-ui/tokens       (typeScales.ts, fontFamilies.ts, fontWeights.ts)
+#   radii      @leafygreen-ui/tokens       (borderRadius.ts — 150 = 6px, LG's control radius)
+#
+# Streamlit's theming covers all of it. app.py adds exactly one rule on top:
+# heading colour, which has no config option.
+
+[theme]
+base = "light"
+
+font        = "Euclid Circular A, Helvetica Neue, Helvetica, Arial, sans-serif"
+headingFont = "MongoDB Value Serif, Times New Roman, serif"
+codeFont    = "Source Code Pro:https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500;600&display=swap"
+
+baseFontSize = 16          # typeScales.body2
+codeFontSize = "0.8125rem" # typeScales.code1 = 13px
+baseRadius   = "6px"       # borderRadius.150
+buttonRadius = "6px"
+linkUnderline    = false
+showWidgetBorder = true
+
+# h1 48/64 serif, h2 32/40 serif, h3 24/32, subtitle 18/24, body 16, disclaimer 12
+headingFontSizes    = ["3rem", "2rem", "1.5rem", "1.125rem", "1rem", "0.75rem"]
+headingFontWeights  = [400, 400, 500, 600, 600, 600]
+metricValueFontSize = "2rem"
+
+# Euclid Circular A ships only Regular and Medium as web faces; LeafyGreen's
+# own note is that its "bold" was always rendering the semibold face, so 600
+# and 700 both point at Medium rather than letting the browser fake-bold.
+[[theme.fontFaces]]
+family = "Euclid Circular A"
+url    = "https://static.mongodb.com/com/fonts/EuclidCircularA-Regular-WebXL.woff2"
+weight = "400"
+style  = "normal"
+
+[[theme.fontFaces]]
+family = "Euclid Circular A"
+url    = "https://static.mongodb.com/com/fonts/EuclidCircularA-Medium-WebXL.woff2"
+weight = "500"
+style  = "normal"
+
+[[theme.fontFaces]]
+family = "Euclid Circular A"
+url    = "https://static.mongodb.com/com/fonts/EuclidCircularA-Medium-WebXL.woff2"
+weight = "600"
+style  = "normal"
+
+[[theme.fontFaces]]
+family = "Euclid Circular A"
+url    = "https://static.mongodb.com/com/fonts/EuclidCircularA-Medium-WebXL.woff2"
+weight = "700"
+style  = "normal"
+
+[[theme.fontFaces]]
+family = "MongoDB Value Serif"
+url    = "https://static.mongodb.com/com/fonts/MongoDBValueSerif-Regular.woff2"
+weight = "400"
+style  = "normal"
+
+[[theme.fontFaces]]
+family = "MongoDB Value Serif"
+url    = "https://static.mongodb.com/com/fonts/MongoDBValueSerif-Medium.woff2"
+weight = "500"
+style  = "normal"
+
+[[theme.fontFaces]]
+family = "MongoDB Value Serif"
+url    = "https://static.mongodb.com/com/fonts/MongoDBValueSerif-Bold.woff2"
+weight = "700"
+style  = "normal"
+
+
+# ── Light mode ────────────────────────────────────────────────────────────────
+# primaryColor is green.dark2, not the brand spring green: #00ED64 on white is
+# 1.4:1 and unreadable as a button fill or accent.
+
+[theme.light]
+primaryColor             = "#00684A"  # green.dark2
+backgroundColor          = "#FFFFFF"  # white
+secondaryBackgroundColor = "#F9FBFA"  # gray.light3
+textColor                = "#001E2B"  # black
+linkColor                = "#016BF8"  # blue.base
+borderColor              = "#E8EDEB"  # gray.light2
+
+codeBackgroundColor            = "#F9FBFA"  # gray.light3
+codeTextColor                  = "#1C2D38"  # gray.dark3
+dataframeBorderColor           = "#E8EDEB"  # gray.light2
+dataframeHeaderBackgroundColor = "#F9FBFA"  # gray.light3
+
+greenColor  = "#00ED64"
+greenTextColor  = "#00684A"
+greenBackgroundColor  = "#E3FCF7"
+redColor    = "#DB3030"
+redTextColor    = "#970606"
+redBackgroundColor    = "#FFEAE5"
+yellowColor = "#FFC010"
+yellowTextColor = "#944F01"
+yellowBackgroundColor = "#FEF7DB"
+orangeColor = "#FFC010"
+orangeTextColor = "#944F01"
+orangeBackgroundColor = "#FFEC9E"
+blueColor   = "#016BF8"
+blueTextColor   = "#083C90"
+blueBackgroundColor   = "#E1F7FF"
+violetColor = "#B45AF2"
+violetTextColor = "#5E0C9E"
+violetBackgroundColor = "#F9EBFF"
+grayColor   = "#889397"
+grayTextColor   = "#3D4F58"
+grayBackgroundColor   = "#E8EDEB"
+
+[theme.light.sidebar]
+backgroundColor          = "#F9FBFA"  # gray.light3
+secondaryBackgroundColor = "#FFFFFF"
+borderColor              = "#E8EDEB"  # gray.light2
+codeBackgroundColor      = "#FFFFFF"
+
+
+# ── Dark mode ─────────────────────────────────────────────────────────────────
+
+[theme.dark]
+primaryColor             = "#00ED64"  # green.base
+backgroundColor          = "#001E2B"  # black
+secondaryBackgroundColor = "#112733"  # gray.dark4
+textColor                = "#E8EDEB"  # gray.light2
+linkColor                = "#0498EC"  # blue.light1
+borderColor              = "#3D4F58"  # gray.dark2
+
+codeBackgroundColor            = "#1C2D38"  # gray.dark3
+codeTextColor                  = "#C1C7C6"  # gray.light1
+dataframeBorderColor           = "#3D4F58"  # gray.dark2
+dataframeHeaderBackgroundColor = "#1C2D38"  # gray.dark3
+
+greenColor  = "#00ED64"
+greenTextColor  = "#71F6BA"
+greenBackgroundColor  = "#023430"
+redColor    = "#FF6960"
+redTextColor    = "#FFCDC7"
+redBackgroundColor    = "#5B0000"
+yellowColor = "#FFC010"
+yellowTextColor = "#FFEC9E"
+yellowBackgroundColor = "#4C2100"
+orangeColor = "#FFC010"
+orangeTextColor = "#FFEC9E"
+orangeBackgroundColor = "#4C2100"
+blueColor   = "#0498EC"
+blueTextColor   = "#C3E7FE"
+blueBackgroundColor   = "#0C2657"
+violetColor = "#B45AF2"
+violetTextColor = "#F1D4FD"
+violetBackgroundColor = "#2D0B59"
+grayColor   = "#889397"
+grayTextColor   = "#C1C7C6"
+grayBackgroundColor   = "#1C2D38"
+
+[theme.dark.sidebar]
+backgroundColor          = "#112733"  # gray.dark4
+secondaryBackgroundColor = "#1C2D38"  # gray.dark3
+borderColor              = "#3D4F58"  # gray.dark2
+codeBackgroundColor      = "#1C2D38"
