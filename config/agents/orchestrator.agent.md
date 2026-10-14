@@ -15,6 +15,7 @@ collections: []
 memory:
   shortTerm: true
   longTerm: true
+  backend: magenta
 ---
 
 # Orchestrator

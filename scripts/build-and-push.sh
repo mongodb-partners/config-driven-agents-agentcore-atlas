@@ -67,11 +67,29 @@ if ! docker buildx version >/dev/null 2>&1; then
   exit 1
 fi
 
+# Magenta Memory credentials, when terraform passed them in. Both go in as
+# --secret, never --build-arg: build args are substituted into the image history
+# in plaintext, and the client id is a credential in its own right — agentcore.tf
+# also feeds it to the runtime as AGENTIC_MEMORY_API_KEY.
+#
+# The one build arg is a truncated hash of the id, which exists solely to give
+# the install layer a cache key. See agent/Dockerfile for why it has to.
+MAGENTA_ARGS=()
+if [ -n "${MAGENTA_CLIENT_ID:-}" ] && [ -n "${MAGENTA_CLIENT_SECRET:-}" ]; then
+  FINGERPRINT="$(printf '%s' "$MAGENTA_CLIENT_ID" | shasum -a 256 | cut -c1-16)"
+  MAGENTA_ARGS+=(--build-arg "MAGENTA_CREDS_FINGERPRINT=$FINGERPRINT")
+  MAGENTA_ARGS+=(--secret "id=magenta_client_id,env=MAGENTA_CLIENT_ID")
+  MAGENTA_ARGS+=(--secret "id=magenta_client_secret,env=MAGENTA_CLIENT_SECRET")
+fi
+
 echo "Building $(basename "$(dirname "$DOCKERFILE")") for linux/arm64 — this is the slow step on an x86 host."
 
+# The ${arr[@]+...} guard is for bash 3.2 (macOS default), where an empty array
+# expansion under `set -u` is an error.
 docker buildx build \
   --platform linux/arm64 \
   --provenance=false \
+  ${MAGENTA_ARGS[@]+"${MAGENTA_ARGS[@]}"} \
   -f "$DOCKERFILE" \
   -t "${REPO_URL}:${TAG}" \
   -t "${REPO_URL}:latest" \

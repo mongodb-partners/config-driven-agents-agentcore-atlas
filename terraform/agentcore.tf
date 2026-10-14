@@ -100,6 +100,24 @@ resource "aws_bedrockagentcore_agent_runtime" "agents" {
     var.voyage_api_key == "" ? {} : {
       VOYAGE_API_KEY = var.voyage_api_key
     },
+    # Magenta Memory credentials — only consumed by agents with
+    # `memory.backend: magenta`. Injected into every runtime (harmless to an
+    # atlas agent, which never reads them) so switching backends stays a
+    # config-only change with no redeploy of Terraform variables.
+    # The Memory SDK sends its credential verbatim as a bearer token, so it needs
+    # an access token rather than a client id. platform_memory.py mints one at
+    # run time from these two — the same client_credentials exchange the image
+    # build uses to reach the private package registry.
+    var.magenta_client_id == "" ? {} : {
+      MAGENTA_CLIENT_ID     = var.magenta_client_id
+      MAGENTA_CLIENT_SECRET = var.magenta_client_secret
+    },
+    var.agentic_memory_project_id == "" ? {} : {
+      AGENTIC_MEMORY_PROJECT_ID = var.agentic_memory_project_id
+    },
+    var.agentic_memory_base_url == "" ? {} : {
+      AGENTIC_MEMORY_BASE_URL = var.agentic_memory_base_url
+    },
   )
 
   depends_on = [

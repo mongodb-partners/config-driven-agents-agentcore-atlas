@@ -32,6 +32,11 @@ AGENT = agent_config.load_agent(os.environ["AGENT_ID"])
 REGION = mongo_mcp.REGION
 RUNTIME_MAP_PARAM = os.environ.get("RUNTIME_MAP_PARAM", "")
 
+# The long-term memory backend this agent uses — atlas (built-in) or magenta
+# (managed service) — chosen by `memory.backend` in its definition. Resolved once
+# at import so a misconfigured `magenta` agent fails at cold start, not mid-turn.
+BACKEND = memory.get_backend(AGENT)
+
 app = BedrockAgentCoreApp()
 
 # botocore's default read_timeout is 60s, and on a streaming response that is the
@@ -278,10 +283,13 @@ def invoke_specialist(agent_id: str, prompt: str, session_id: str, user_id: str,
 async def run_orchestrator(prompt: str, session_id: str, user_id: str, tr: Trace):
     facts = []
     if AGENT.long_term:
-        facts = memory.recall_facts(user_id, prompt)
+        recalled = BACKEND.recall(user_id, session_id, prompt)
+        facts = recalled.facts
         yield {"type": "trace", **tr.event(
-            "memory.recall", source="agent_facts", count=len(facts),
-            facts=[f.get("text") for f in facts],
+            "memory.recall", backend=BACKEND.name,
+            source="agent_facts" if BACKEND.name == "atlas" else "magenta",
+            count=len(facts), facts=[f.get("text") for f in facts],
+            error=recalled.error or None,
         )}
 
     turns = []
@@ -340,25 +348,39 @@ async def run_orchestrator(prompt: str, session_id: str, user_id: str, tr: Trace
 
     # Persistence runs after the answer has streamed, so it costs the candidate
     # no perceived latency.
-    if AGENT.long_term and answer.strip():
+    if answer.strip():
+        # The session list is UI bookkeeping, not memory — it must exist for every
+        # backend, so it stays here rather than inside persist().
         memory.touch_session(user_id, session_id, prompt)
-        written = memory.store_messages(
-            user_id, session_id, state.get("agentId") or AGENT.id,
-            [("user", prompt), ("assistant", answer)],
+
+    if AGENT.long_term and answer.strip():
+        result = BACKEND.persist(
+            user_id, session_id, state.get("agentId") or AGENT.id, prompt, answer,
         )
         yield {"type": "trace", **tr.event(
-            "memory.write", collection="chat_messages", count=written)}
+            "memory.write", backend=BACKEND.name,
+            collection="chat_messages" if BACKEND.name == "atlas" else "magenta",
+            count=result.messages, error=result.error or None,
+        )}
 
-        stored, extract_usage = memory.extract_facts(user_id, session_id, prompt, answer)
+        # The atlas backend runs a second Bedrock call to extract durable facts,
+        # so it reports what it stored and that call's token usage. The magenta
+        # backend extracts server-side and has no local usage to bill — it still
+        # emits memory.extract (count 0) so the UI's Memory tab stays consistent.
+        stored = getattr(result, "facts", [])
         yield {"type": "trace", **tr.event(
-            "memory.extract", collection="agent_facts", count=len(stored),
-            facts=[f["text"] for f in stored],
+            "memory.extract", backend=BACKEND.name,
+            collection="agent_facts" if BACKEND.name == "atlas" else "magenta",
+            count=len(stored), facts=[f.get("text") for f in stored],
         )}
-        # Easy to forget this one: it runs after the answer has already streamed,
-        # so it costs the candidate no latency but every bit as much money.
-        yield {"type": "trace", **tr.usage(
-            "memory.extract", memory.EXTRACTION_MODEL, extract_usage,
-        )}
+        extract_usage = getattr(result, "extract_usage", None)
+        if extract_usage:
+            # Easy to forget this one: it runs after the answer has already
+            # streamed, so it costs the candidate no latency but every bit as
+            # much money.
+            yield {"type": "trace", **tr.usage(
+                "memory.extract", memory.EXTRACTION_MODEL, extract_usage,
+            )}
 
     if AGENT.short_term and answer.strip():
         memory.record_turn(user_id, session_id, prompt, answer)
@@ -369,10 +391,13 @@ async def run_orchestrator(prompt: str, session_id: str, user_id: str, tr: Trace
 async def run_specialist(prompt: str, session_id: str, user_id: str, tr: Trace):
     facts = []
     if AGENT.long_term:
-        facts = memory.recall_facts(user_id, prompt)
+        recalled = BACKEND.recall(user_id, session_id, prompt)
+        facts = recalled.facts
         yield {"type": "trace", **tr.event(
-            "memory.recall", source="agent_facts", count=len(facts),
-            facts=[f.get("text") for f in facts],
+            "memory.recall", backend=BACKEND.name,
+            source="agent_facts" if BACKEND.name == "atlas" else "magenta",
+            count=len(facts), facts=[f.get("text") for f in facts],
+            error=recalled.error or None,
         )}
 
     built = agent_tools.build_tools(AGENT)

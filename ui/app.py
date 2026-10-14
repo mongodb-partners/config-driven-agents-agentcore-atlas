@@ -285,19 +285,36 @@ def render_trace(events: list[dict], trace_id: str) -> None:
                 st.divider()
 
         with tab_memory:
+            # Which long-term backend answered this turn — atlas (the built-in
+            # Atlas fact store) or magenta (the managed Magenta Memory service).
+            backend = next(
+                (ev.get("backend") for ev in events
+                 if ev.get("kind") in ("memory.recall", "memory.extract") and ev.get("backend")),
+                None,
+            )
+            if backend:
+                st.caption(f"Long-term backend: **{backend}**")
             for ev in events:
                 if ev.get("kind") == "memory.recall":
-                    st.markdown(f"**Recalled from `agent_facts`** ({ev.get('count', 0)})")
+                    src = ev.get("source", "agent_facts")
+                    st.markdown(f"**Recalled from `{src}`** ({ev.get('count', 0)})")
                     for fact in ev.get("facts") or []:
                         st.markdown(f"- {fact}")
+                    if ev.get("error"):
+                        st.caption(f"Recall degraded: {ev['error']}")
                 if ev.get("kind") == "memory.extract":
-                    st.markdown(f"**Extracted into `agent_facts`** ({ev.get('count', 0)})")
+                    dst = ev.get("collection", "agent_facts")
+                    st.markdown(f"**Extracted into `{dst}`** ({ev.get('count', 0)})")
                     for fact in ev.get("facts") or []:
                         st.markdown(f"- {fact}")
+                if ev.get("kind") == "memory.write" and ev.get("error"):
+                    st.caption(f"Memory write degraded: {ev['error']}")
                 if ev.get("kind") == "memory.short_term":
                     st.caption(f"AgentCore short-term memory: {ev.get('turns', 0)} turn(s) loaded")
-            st.caption("Long-term facts and chat messages live in Atlas; short-term turns "
-                       "live in the AgentCore Memory service.")
+            st.caption("With the `atlas` backend, long-term facts and chat messages live in "
+                       "Atlas; with `magenta`, they live in the managed Magenta Memory "
+                       "service. Short-term turns live in the AgentCore Memory service in "
+                       "both cases.")
 
         with tab_raw:
             st.caption("Exactly what the runtimes emitted — the same JSON lines that reach "

@@ -21,6 +21,12 @@ CONFIG_DIR = Path(os.environ.get("CONFIG_DIR", "/app/config"))
 _MIN_THINKING_BUDGET = 1024
 _DEFAULT_THINKING_BUDGET = 1024
 
+# Long-term memory backends an agent may select in its `memory.backend`.
+#   atlas   — the built-in Atlas fact store (LLM extraction + vector search).
+#   magenta — the managed Magenta Memory service, via agentic-platform-memory.
+_MEMORY_BACKENDS = ("atlas", "magenta")
+_DEFAULT_MEMORY_BACKEND = "atlas"
+
 
 @dataclass
 class AgentDef:
@@ -35,6 +41,10 @@ class AgentDef:
     collections: list[str]
     short_term: bool
     long_term: bool
+    # Which long-term memory backend this agent uses: "atlas" (default, the
+    # built-in Atlas fact store) or "magenta" (the managed Magenta Memory
+    # service). Only meaningful when long_term is True.
+    long_term_backend: str
     # 0 means no extended thinking, and therefore no reasoning stream: Bedrock
     # only emits reasoningContent deltas when a thinking budget is set.
     thinking_budget: int
@@ -82,6 +92,22 @@ def _thinking_budget(meta: dict) -> int:
     return budget
 
 
+def _memory_backend(agent_id: str, memory: dict) -> str:
+    """The long-term backend named in `memory.backend`, defaulting to atlas.
+
+    A typo here would otherwise fall through to the atlas backend silently and an
+    attendee would wonder why `magenta` never engaged — so an unknown value is an
+    error at load, in the same fail-fast spirit as `_thinking_budget`.
+    """
+    backend = memory.get("backend", _DEFAULT_MEMORY_BACKEND)
+    if backend not in _MEMORY_BACKENDS:
+        raise ValueError(
+            f"{agent_id}: memory.backend '{backend}' is not one of "
+            f"{', '.join(_MEMORY_BACKENDS)}"
+        )
+    return backend
+
+
 def load_agent(agent_id: str) -> AgentDef:
     path = CONFIG_DIR / "agents" / f"{agent_id}.agent.md"
     if not path.exists():
@@ -101,6 +127,7 @@ def load_agent(agent_id: str) -> AgentDef:
         collections=meta.get("collections") or [],
         short_term=bool(memory.get("shortTerm", False)),
         long_term=bool(memory.get("longTerm", False)),
+        long_term_backend=_memory_backend(meta["id"], memory),
         thinking_budget=_thinking_budget(meta),
         system_prompt=body,
         skill_docs={s: _load_skill(s) for s in skills},

@@ -222,3 +222,80 @@ def touch_session(user_id: str, session_id: str, first_message: str) -> None:
         },
         upsert=True,
     )
+
+
+# ── Backend seam ──────────────────────────────────────────────────────────────
+#
+# Long-term memory has two interchangeable backends, chosen per agent by
+# `memory.backend` in its `.agent.md`:
+#
+#   atlas    the functions above — LLM fact extraction + Atlas vector search.
+#   magenta  the managed Magenta Memory service (see platform_memory.py).
+#
+# `get_backend(agent_def)` returns the right one so `main.py` never branches on
+# the backend name itself. The atlas backend is a thin adapter over the existing
+# functions, so its behaviour is byte-for-byte what it always was.
+
+
+class AtlasRecall:
+    """Recall result mirroring the magenta backend's shape.
+
+    `facts` is the `{"text": ...}` list `_facts_block` consumes; `formatted` is
+    unused by atlas (it injects a fact list, not a pre-formatted block).
+    """
+
+    def __init__(self, facts: list[dict]):
+        self.facts = facts
+        self.formatted = ""
+        self.error = ""
+
+
+class AtlasPersist:
+    """Persist result: message count plus the extraction call's own token usage.
+
+    The atlas backend runs a second Bedrock call to extract durable facts, so it
+    carries `extract_usage` for the cost panel — the magenta backend has no such
+    local call and reports none.
+    """
+
+    def __init__(self, messages: int, facts: list[dict], extract_usage: dict):
+        self.messages = messages
+        self.facts = facts
+        self.extract_usage = extract_usage
+        self.error = ""
+
+
+class AtlasBackend:
+    """The built-in long-term backend: Atlas facts + chat messages."""
+
+    name = "atlas"
+
+    def recall(self, user_id: str, session_id: str, query: str) -> AtlasRecall:
+        return AtlasRecall(recall_facts(user_id, query))
+
+    def short_term(self, user_id: str, session_id: str) -> list[dict]:
+        # Short-term for atlas agents is the AgentCore buffer, handled by main.py
+        # via short_term_turns(); nothing Atlas-specific to add here.
+        return short_term_turns(user_id, session_id)
+
+    def persist(self, user_id: str, session_id: str, agent_id: str,
+                user_text: str, assistant_text: str) -> AtlasPersist:
+        written = store_messages(
+            user_id, session_id, agent_id,
+            [("user", user_text), ("assistant", assistant_text)],
+        )
+        stored, usage = extract_facts(user_id, session_id, user_text, assistant_text)
+        return AtlasPersist(messages=written, facts=stored, extract_usage=usage)
+
+
+def get_backend(agent_def):
+    """The long-term backend for an agent, from its `long_term_backend`.
+
+    Imports the magenta backend lazily so an atlas-only deployment never touches
+    the SDK. Unknown names are already rejected at config load, so this only ever
+    sees a validated value.
+    """
+    if getattr(agent_def, "long_term_backend", "atlas") == "magenta":
+        import platform_memory
+        return platform_memory.MagentaBackend()
+    return AtlasBackend()

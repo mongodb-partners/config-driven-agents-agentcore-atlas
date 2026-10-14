@@ -210,6 +210,58 @@ variable "voyage_embed_model" {
   }
 }
 
+# ── Magenta Memory (optional long-term backend) ───────────────────────────────
+
+variable "agentic_memory_project_id" {
+  description = <<-EOT
+    Project id for the hosted Magenta Memory service, paired with
+    magenta_client_id. Selects the project's route shape. Required for the hosted
+    service; leave empty when targeting a self-hosted backend by base URL.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "magenta_client_id" {
+  description = <<-EOT
+    Agentic Platform client id. It does double duty:
+
+      · build time — the agent Dockerfile exchanges it (with
+        magenta_client_secret) for a short-lived token and installs
+        `agentic-platform-memory` from the private package registry.
+      · run time   — the runtimes repeat that exchange to authenticate the
+        Memory SDK itself, so both values reach them as MAGENTA_CLIENT_ID and
+        MAGENTA_CLIENT_SECRET.
+
+    So it is a secret, not just an identifier. Leave it and magenta_client_secret
+    empty and the SDK is never installed — `memory.backend: atlas` agents are
+    unaffected, and a `magenta` agent fails on its first turn.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "magenta_client_secret" {
+  description = <<-EOT
+    OAuth client secret paired with magenta_client_id. Reaches the build as a
+    BuildKit secret, so it is never written into an image layer or its history.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "agentic_memory_base_url" {
+  description = <<-EOT
+    Override the Magenta Memory backend URL. Leave empty for the hosted service
+    (the SDK's default host). Set it only to target a self-hosted or non-prod
+    Memory Server.
+  EOT
+  type        = string
+  default     = ""
+}
+
 # ── Compute ───────────────────────────────────────────────────────────────────
 
 variable "ec2_instance_type" {

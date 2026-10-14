@@ -119,7 +119,32 @@ What it does **not** work around is a guardrail that *blocks* your content — t
 a refusal in the agent's answer, not an IAM error. If that happens, the guardrail belongs to
 your org's security team, not to this stack.
 
-### 2.6 Service quotas
+### 2.6 Optional: Magenta Memory (only for the `magenta` backend)
+
+Skip this unless you set `memory.backend: magenta` on an agent. By default every
+agent uses the built-in Atlas long-term memory and needs nothing here.
+
+The `magenta` backend uses the managed **Magenta Memory** service. Provision an
+OAuth client (id + secret) and a project through the Agentic Platform, then set
+them in `terraform.tfvars`:
+
+```hcl
+magenta_client_id         = "<your-client-id>"
+magenta_client_secret     = "<your-client-secret>"
+agentic_memory_project_id = "<your-project-id>"
+# agentic_memory_base_url = "…"   # only for a self-hosted / non-prod backend
+```
+
+The client id and secret are used twice. At **build time** they mint a token so
+the image can install the `agentic-platform-memory` SDK, which is served from the
+Agentic Platform's private package registry rather than PyPI. At **run time** the
+agent repeats that exchange and hands the resulting access token to the Memory
+SDK. Treat both as secrets and keep them out of version control.
+
+A `magenta` agent raises on its first turn if these are unset, so configure them
+before deploying one.
+
+### 2.7 Service quotas
 
 Defaults are fine for a fresh account. Check only if yours is heavily used:
 

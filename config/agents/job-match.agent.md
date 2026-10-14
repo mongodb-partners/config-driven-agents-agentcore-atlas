@@ -24,6 +24,7 @@ collections:
 memory:
   shortTerm: true
   longTerm: true
+  backend: magenta
 ---
 
 # Job Match

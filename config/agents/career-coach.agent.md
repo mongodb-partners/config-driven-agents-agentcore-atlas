@@ -26,6 +26,7 @@ collections:
 memory:
   shortTerm: true
   longTerm: true
+  backend: magenta
 ---
 
 # Career Coach

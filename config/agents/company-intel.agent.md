@@ -23,6 +23,7 @@ collections:
 memory:
   shortTerm: true
   longTerm: true
+  backend: magenta
 ---
 
 # Company Intel
