@@ -1,0 +1,31 @@
+# Project-level configuration (Atlas Agent Engine). The memory server is
+# project-scoped: one configuration applies to all agents in the project.
+# Secrets are NEVER set here — upload with `agentengine secret set
+# --project-scope`. See specs/memory_enablement_spec.md.
+memory:
+  log_level: info
+  voyage:
+    model: "voyage-4-large"
+    dimension: 1024
+  short_term:
+    embed_on_write: false
+  extraction_llm:
+    provider: openai          # Bedrock is not a supported extraction provider
+    model: gpt-4o-mini                  # provider default
+    base_url: https://grove-gateway-prod.azure-api.net/grove-foundry-prod/openai/v1/
+    api_key_secret: LLM_API_KEY   # NAME of the env var in .env, never the key value
+  background_extraction:
+    snapshot:
+      max_messages: 20
+      stale_minutes: 3
+      embed_stm_before_promotion: true
+      topic_shift_enabled: false
+      topic_shift_threshold: 0.35
+      delete_promoted: false
+      ttl_days: 30
+  extraction:
+    enabled:
+      - semantic
+      - episodic
+      - taxonomic
+      # procedural: opt in later if the "learned workflow" beat is wanted

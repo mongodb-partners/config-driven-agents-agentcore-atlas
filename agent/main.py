@@ -32,9 +32,10 @@ AGENT = agent_config.load_agent(os.environ["AGENT_ID"])
 REGION = mongo_mcp.REGION
 RUNTIME_MAP_PARAM = os.environ.get("RUNTIME_MAP_PARAM", "")
 
-# The long-term memory backend this agent uses — atlas (built-in) or magenta
-# (managed service) — chosen by `memory.backend` in its definition. Resolved once
-# at import so a misconfigured `magenta` agent fails at cold start, not mid-turn.
+# The long-term memory backend this agent uses — atlas (built-in) or engine
+# (Atlas Agent Engine memory service) — chosen by `memory.backend` in its
+# definition. Resolved once
+# at import so a misconfigured `engine` agent fails at cold start, not mid-turn.
 BACKEND = memory.get_backend(AGENT)
 
 app = BedrockAgentCoreApp()
@@ -287,7 +288,7 @@ async def run_orchestrator(prompt: str, session_id: str, user_id: str, tr: Trace
         facts = recalled.facts
         yield {"type": "trace", **tr.event(
             "memory.recall", backend=BACKEND.name,
-            source="agent_facts" if BACKEND.name == "atlas" else "magenta",
+            source="agent_facts" if BACKEND.name == "atlas" else "engine",
             count=len(facts), facts=[f.get("text") for f in facts],
             error=recalled.error or None,
         )}
@@ -359,18 +360,18 @@ async def run_orchestrator(prompt: str, session_id: str, user_id: str, tr: Trace
         )
         yield {"type": "trace", **tr.event(
             "memory.write", backend=BACKEND.name,
-            collection="chat_messages" if BACKEND.name == "atlas" else "magenta",
+            collection="chat_messages" if BACKEND.name == "atlas" else "engine",
             count=result.messages, error=result.error or None,
         )}
 
         # The atlas backend runs a second Bedrock call to extract durable facts,
-        # so it reports what it stored and that call's token usage. The magenta
+        # so it reports what it stored and that call's token usage. The engine
         # backend extracts server-side and has no local usage to bill — it still
         # emits memory.extract (count 0) so the UI's Memory tab stays consistent.
         stored = getattr(result, "facts", [])
         yield {"type": "trace", **tr.event(
             "memory.extract", backend=BACKEND.name,
-            collection="agent_facts" if BACKEND.name == "atlas" else "magenta",
+            collection="agent_facts" if BACKEND.name == "atlas" else "engine",
             count=len(stored), facts=[f.get("text") for f in stored],
         )}
         extract_usage = getattr(result, "extract_usage", None)
@@ -395,7 +396,7 @@ async def run_specialist(prompt: str, session_id: str, user_id: str, tr: Trace):
         facts = recalled.facts
         yield {"type": "trace", **tr.event(
             "memory.recall", backend=BACKEND.name,
-            source="agent_facts" if BACKEND.name == "atlas" else "magenta",
+            source="agent_facts" if BACKEND.name == "atlas" else "engine",
             count=len(facts), facts=[f.get("text") for f in facts],
             error=recalled.error or None,
         )}

@@ -67,29 +67,31 @@ voyage_api_key = ""
 #   auto:         voyage-4, voyage-4-large, voyage-4-lite, voyage-code-3
 voyage_embed_model = "voyage-4"
 
-# ── Magenta Memory: only for the "magenta" long-term backend ──────────────────
-# Skip this entirely unless an agent sets `memory.backend: magenta` in its
+# ── Atlas Agent Engine memory: only for the "engine" long-term backend ────────
+# Skip this entirely unless an agent sets `memory.backend: engine` in its
 # `.agent.md`. By default every agent uses the built-in Atlas long-term memory
 # and needs nothing here.
 #
-# The "magenta" backend uses the managed Magenta Memory service. Provision an
-# OAuth client and a project through the Agentic Platform, then set all three
-# below. A "magenta" agent raises on its first turn if they are unset.
+# The "engine" backend uses the Atlas Agent Engine memory service. Provision a
+# memory-only project and a service account with the `agentengine` CLI (see
+# PRE_REQUISITES.md §2.6), then set all three below. An "engine" agent raises on
+# its first turn if they are unset. Magenta-era OAuth clients do not carry over —
+# create a fresh service account.
 #
 # The client id and secret do two jobs. At build time they mint a token so the
-# image can install the `agentic-platform-memory` SDK, which is served from the
-# Agentic Platform's private registry rather than PyPI. At run time the client id
-# is itself the credential the SDK authenticates with. Both are secrets — this
+# image can install the `agent-engine-sdk-memory` SDK, which is served from the
+# Atlas Agent Engine's private registry rather than PyPI. At run time the client
+# id is itself the credential the SDK authenticates with. Both are secrets — this
 # file is gitignored, so keep them here rather than committing them elsewhere.
 #
 # Leave the id and secret empty and the SDK is never installed, which is fine for
 # an atlas-only workshop.
 #
-# magenta_client_id         = "REPLACE_ME"
-# magenta_client_secret     = "REPLACE_ME"
-# agentic_memory_project_id = "REPLACE_ME"
+# agent_engine_client_id      = "REPLACE_ME"
+# agent_engine_client_secret  = "REPLACE_ME"
+# agentic_memory_project_id   = "REPLACE_ME"
 #
-# Only for a self-hosted or non-prod Memory Server; leave unset for the hosted
+# Only for a self-hosted or non-prod memory server; leave unset for the hosted
 # service (the SDK's default host).
 # agentic_memory_base_url = ""
 

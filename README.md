@@ -250,7 +250,7 @@ stream back off.
 Short-term memory is the only thing that is *not* in Atlas: it lives in the
 **AgentCore Memory service**, keyed by actor and session.
 
-### Long-term memory backend: `atlas` or `magenta`
+### Long-term memory backend: `atlas` or `engine`
 
 Long-term memory has two interchangeable backends, chosen per agent by one line
 in its `.agent.md`:
@@ -259,36 +259,39 @@ in its `.agent.md`:
 memory:
   shortTerm: true
   longTerm: true
-  backend: magenta     # atlas (default) | magenta
+  backend: engine     # atlas (default) | engine
 ```
 
 | Backend | What it is |
 |---|---|
 | `atlas` *(default)* | The built-in store described above — an LLM extracts durable facts into `agent_facts`, embedded and recalled semantically. You own the extraction and the schema. |
-| `magenta` | The managed **Magenta Memory** service, via the [`agentic-platform-memory`](https://pypi.org/project/agentic-platform-memory/) SDK. The framework records each turn and asks the service for relevant context; extraction and storage are handled server-side. |
+| `engine` | The **Atlas Agent Engine** memory service, via the `agent-engine-sdk-memory` SDK ([docs](https://www.mongodb.com/docs/agentengine/add-features/memory-only/)). The framework records each turn and asks the service for relevant context; extraction and storage are handled server-side. |
 
 Switching is config-only: change `backend`, re-run `./deploy.sh`, and no Python
 changes. Every existing agent omits `backend` and so keeps using `atlas` — the
 default is unchanged. Short-term memory is the AgentCore buffer in both cases;
 only the long-term recall/persist path differs.
 
-The `magenta` backend authenticates with an OAuth client. Set
-`magenta_client_id`, `magenta_client_secret` and `agentic_memory_project_id` as
-Terraform variables; the first two reach the runtimes as `MAGENTA_CLIENT_ID` /
-`MAGENTA_CLIENT_SECRET`, and a `magenta` agent raises on its first turn if they
-are missing.
+The `engine` backend authenticates with an Atlas Agent Engine **service
+account** (see PRE_REQUISITES.md §2.6 for provisioning). Set
+`agent_engine_client_id`, `agent_engine_client_secret` and
+`agentic_memory_project_id` as Terraform variables; the first two reach the
+runtimes as `AGENT_ENGINE_CLIENT_ID` / `AGENT_ENGINE_CLIENT_SECRET`, and an
+`engine` agent raises on its first turn if they are missing.
 
-The same client does two jobs. At build time it mints a token so the image can
-install the SDK from the private package registry. At run time `platform_memory`
-repeats that `client_credentials` exchange and hands the resulting **access
-token** to the SDK, which sends it as `Authorization: Bearer …`. The client id is
+The same service account does two jobs. At build time it mints a token so the
+image can install the SDK from the private package registry. At run time
+`platform_memory` repeats that `client_credentials` exchange against
+`https://agentengine.mongodb.com/api/v1/oauth/token` and hands the resulting
+**access token** to the SDK as `service_account_token`, which sends it as
+`Authorization: Bearer …`. The client id is
 not itself a bearer token — passing it directly is what produces
 `MemoryAuthError: AUTH_FAILED`. Tokens are re-minted a minute before they expire,
 and an auth failure drops the cached token so the next turn retries with a fresh
 one.
 
 A pre-minted token can be supplied directly as `AGENTIC_MEMORY_API_KEY`, and a
-self-hosted Memory Server via `AGENTIC_MEMORY_BASE_URL`. A memory-service outage
+self-hosted memory server via `AGENTIC_MEMORY_BASE_URL`. A memory-service outage
 degrades to "no recall this turn" — it never breaks the answer — and the Memory
 tab shows the active backend and any degradation.
 

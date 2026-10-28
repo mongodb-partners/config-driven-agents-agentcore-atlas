@@ -119,29 +119,60 @@ What it does **not** work around is a guardrail that *blocks* your content — t
 a refusal in the agent's answer, not an IAM error. If that happens, the guardrail belongs to
 your org's security team, not to this stack.
 
-### 2.6 Optional: Magenta Memory (only for the `magenta` backend)
+### 2.6 Optional: Atlas Agent Engine memory (only for the `engine` backend)
 
-Skip this unless you set `memory.backend: magenta` on an agent. By default every
+Skip this unless you set `memory.backend: engine` on an agent. By default every
 agent uses the built-in Atlas long-term memory and needs nothing here.
 
-The `magenta` backend uses the managed **Magenta Memory** service. Provision an
-OAuth client (id + secret) and a project through the Agentic Platform, then set
-them in `terraform.tfvars`:
+The `engine` backend uses the **Atlas Agent Engine** memory service
+([docs](https://www.mongodb.com/docs/agentengine/add-features/memory-only/)).
+If you ran this workshop before the rebrand: **Magenta-era OAuth clients do not
+carry over** — create a fresh service account as below.
+
+Prerequisites on the Atlas side: an Atlas Flex (minimum), M10+ (recommended)
+cluster whose IP access list allows the Atlas Agent Engine data plane — the
+memory service stores its data in this cluster.
+
+Provision with the `agentengine` CLI. The repo ships the memory configuration as
+`agent/project-config.yaml` — no scaffolding step needed:
+
+```bash
+# 1. Register the project and select it
+agentengine project create "RIV Workshop Memory"      # prints the project id
+agentengine auth login --project-id <project-id>
+
+# 2. Set the project's secrets
+agentengine secret set MONGODB_URI --value "<atlas-connection-string>" --project-id <project-id>
+agentengine secret set VOYAGE_API_KEY --value "<voyage-key>" --project-id <project-id>
+agentengine secret set ANTHROPIC_API_KEY --value "<llm-key>" --project-id <project-id>
+
+# 3. Upload the memory config and provision the memory server
+agentengine memory configure agent/
+agentengine memory apply --wait
+
+# 4. Create the service account — the client secret is shown only once
+agentengine service-account create memory-service --project-id <project-id> --role PROJECT_OWNER
+```
+
+Then put the service-account credentials and project id in `terraform.tfvars`:
 
 ```hcl
-magenta_client_id         = "<your-client-id>"
-magenta_client_secret     = "<your-client-secret>"
-agentic_memory_project_id = "<your-project-id>"
+agent_engine_client_id      = "<your-client-id>"
+agent_engine_client_secret  = "<your-client-secret>"
+agentic_memory_project_id   = "<your-project-id>"
 # agentic_memory_base_url = "…"   # only for a self-hosted / non-prod backend
 ```
 
-The client id and secret are used twice. At **build time** they mint a token so
-the image can install the `agentic-platform-memory` SDK, which is served from the
-Agentic Platform's private package registry rather than PyPI. At **run time** the
-agent repeats that exchange and hands the resulting access token to the Memory
-SDK. Treat both as secrets and keep them out of version control.
+The client id and secret are used twice. At **build time** they mint an access
+token so the image can install the `agent-engine-sdk-memory` SDK, which is served
+from the Atlas Agent Engine's private package registry
+(`https://agentengine.mongodb.com/api/v1/packages/python/simple`) rather than
+PyPI. At **run time** the agent repeats that exchange against
+`https://agentengine.mongodb.com/api/v1/oauth/token` and hands the resulting
+access token to the Memory SDK. Treat both as secrets and keep them out of
+version control.
 
-A `magenta` agent raises on its first turn if these are unset, so configure them
+An `engine` agent raises on its first turn if these are unset, so configure them
 before deploying one.
 
 ### 2.7 Service quotas

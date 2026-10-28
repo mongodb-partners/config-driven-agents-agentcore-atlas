@@ -1,5 +1,10 @@
 # Proposal: Integrate Agentic Platform Memory into the Multi-Agent RIV Workshop
 
+> **Historical document.** "Magenta" / "Agentic Platform" was renamed to
+> **MongoDB Atlas Agent Engine** at public preview. Current naming, SDK
+> (`agent-engine-sdk-memory`), and endpoints are in
+> `docs/atlas-agent-engine-rename-spec.md`.
+
 **Audience:** Engineering & Product Leadership
 **Status:** For review / decision
 **Prepared by:** RIV Workshop team

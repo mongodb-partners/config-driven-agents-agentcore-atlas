@@ -1,5 +1,9 @@
 # Magenta Memory persistence — verification report
 
+> **Historical document.** "Magenta" is now **MongoDB Atlas Agent Engine**
+> (`engine` backend, `agent-engine-sdk-memory` SDK). Post-rename verification is
+> tracked separately; see `docs/atlas-agent-engine-rename-spec.md` §5.
+
 **Run:** `mem-20260915-1` · **Date:** 15 September 2026 · **Verdict:** persisted correctly, with two platform-side findings to raise.
 
 Companion to the live test plan (`claude.ai/artifact/FiybjJJxrPParVz4LoM5vT`) and the harness in `scripts/memtest/`.

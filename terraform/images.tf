@@ -37,10 +37,10 @@ resource "null_resource" "build_agent" {
   triggers = {
     source_hash = local.agent_hash
     # Adding, removing or rotating the client id changes what the image contains
-    # (the Magenta SDK) without touching a source file, so it has to force a
+    # (the Agent Engine SDK) without touching a source file, so it has to force a
     # rebuild on its own. Hashed because triggers are stored in plain text in the
     # state file and the id is a credential.
-    magenta = sha256(var.magenta_client_id)
+    agent_engine = sha256(var.agent_engine_client_id)
   }
 
   provisioner "local-exec" {
@@ -49,8 +49,8 @@ resource "null_resource" "build_agent" {
     # Environment, not argv: a secret on a command line is visible to any local
     # `ps`. build-and-push.sh forwards these to buildx as --secret.
     environment = {
-      MAGENTA_CLIENT_ID     = var.magenta_client_id
-      MAGENTA_CLIENT_SECRET = var.magenta_client_secret
+      AGENT_ENGINE_CLIENT_ID     = var.agent_engine_client_id
+      AGENT_ENGINE_CLIENT_SECRET = var.agent_engine_client_secret
     }
 
     command = join(" ", [

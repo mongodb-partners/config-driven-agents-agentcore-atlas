@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Self-check for the magenta long-term memory backend.
+"""Self-check for the `engine` long-term memory backend.
 
-Covers the config seam (`memory.backend`) and the `MagentaBackend` adapter,
-without a live Memory Server: a fake stands in for `agentic_platform_memory.Memory`
+Covers the config seam (`memory.backend`) and the `AgentEngineBackend` adapter,
+without a live memory server: a fake stands in for `agent_engine_sdk_memory.Memory`
 and records the calls the backend makes, so we verify it drives `record_turn` /
 `build_context` with the shapes `main.py` depends on — and that a failure degrades
 rather than raising into the turn.
 
-    python agent/test_platform_memory.py
+    python agent/test_agent_engine_memory.py
 """
 
 import os
@@ -81,10 +81,10 @@ class FakeSession:
 
 
 class FakeMemory:
-    """Stands in for agentic_platform_memory.Memory."""
+    """Stands in for agent_engine_sdk_memory.Memory."""
 
-    def __init__(self, *, api_key=None, project_id=None, base_url=None):
-        self.api_key = api_key
+    def __init__(self, *, service_account_token=None, project_id=None, base_url=None):
+        self.service_account_token = service_account_token
         self.project_id = project_id
         self.base_url = base_url
         self.calls = []
@@ -124,8 +124,9 @@ def _install_fake(**mem_kwargs):
 
     captured = {}
 
-    def factory(*, api_key=None, project_id=None, base_url=None):
-        mem = FakeMemory(api_key=api_key, project_id=project_id, base_url=base_url)
+    def factory(*, service_account_token=None, project_id=None, base_url=None):
+        mem = FakeMemory(service_account_token=service_account_token,
+                         project_id=project_id, base_url=base_url)
         for k, v in mem_kwargs.items():
             setattr(mem, k, v)
         captured["mem"] = mem
@@ -135,7 +136,7 @@ def _install_fake(**mem_kwargs):
     platform_memory.MemoryRequestContext = FakeCtx
     platform_memory._SDK_IMPORT_ERROR = None
 
-    backend = platform_memory.MagentaBackend()
+    backend = platform_memory.AgentEngineBackend()
     return backend, captured
 
 
@@ -145,7 +146,7 @@ def test_backend_defaults_to_atlas():
     """An agent that omits `backend` must default to atlas.
 
     Agents that declare one are opting out deliberately and say nothing about
-    the default — asserting over *every* agent would make adopting `magenta`
+    the default — asserting over *every* agent would make adopting `engine`
     anywhere a test failure.
     """
     for path in (REPO / "config/agents").glob("*.agent.md"):
@@ -157,7 +158,7 @@ def test_backend_defaults_to_atlas():
         assert a.long_term_backend == "atlas", f"{a.id}: {a.long_term_backend}"
 
 
-def test_backend_magenta_parses():
+def test_backend_engine_parses():
     with tempfile.TemporaryDirectory() as tmp:
         staged = Path(tmp) / "config"
         shutil.copytree(REPO / "config", staged)
@@ -165,20 +166,20 @@ def test_backend_magenta_parses():
             "---\n"
             "id: mem-demo\n"
             "name: Mem Demo\n"
-            "description: Demonstrates the magenta memory backend.\n"
+            "description: Demonstrates the engine memory backend.\n"
             "role: specialist\n"
             "model: us.anthropic.claude-haiku-4-5-20251001-v1:0\n"
             "maxTokens: 2048\n"
             "skills: []\n"
             "collections:\n  - compensation_data\n"
-            "memory:\n  shortTerm: true\n  longTerm: true\n  backend: magenta\n"
+            "memory:\n  shortTerm: true\n  longTerm: true\n  backend: engine\n"
             "---\n\n# Mem Demo\n\nYou demo memory.\n"
         )
         original = agent_config.CONFIG_DIR
         try:
             agent_config.CONFIG_DIR = staged
             a = agent_config.load_agent("mem-demo")
-            assert a.long_term_backend == "magenta", a.long_term_backend
+            assert a.long_term_backend == "engine", a.long_term_backend
         finally:
             agent_config.CONFIG_DIR = original
 
@@ -223,12 +224,12 @@ def test_dispatcher_returns_the_right_backend():
     _install_fake()
 
     class M:
-        long_term_backend = "magenta"
+        long_term_backend = "engine"
 
-    assert isinstance(memory.get_backend(M()), platform_memory.MagentaBackend)
+    assert isinstance(memory.get_backend(M()), platform_memory.AgentEngineBackend)
 
 
-# ── MagentaBackend behaviour ──────────────────────────────────────────────────
+# ── AgentEngineBackend behaviour ──────────────────────────────────────────────
 
 def test_recall_maps_chunks_to_facts():
     backend, cap = _install_fake(
@@ -352,12 +353,12 @@ def test_missing_credentials_fail_fast():
     # No creds, no base_url — construction must raise a directed error, not an
     # opaque SDK ValueError mid-turn.
     for var in ("AGENTIC_MEMORY_API_KEY", "AGENTIC_MEMORY_PROJECT_ID",
-                "AGENTIC_MEMORY_BASE_URL", "MAGENTA_CLIENT_ID",
-                "MAGENTA_CLIENT_SECRET"):
+                "AGENTIC_MEMORY_BASE_URL", "AGENT_ENGINE_CLIENT_ID",
+                "AGENT_ENGINE_CLIENT_SECRET"):
         os.environ.pop(var, None)
     platform_memory.Memory = FakeMemory
     platform_memory.MemoryRequestContext = FakeCtx
-    backend = platform_memory.MagentaBackend()
+    backend = platform_memory.AgentEngineBackend()
     try:
         backend._client()
     except RuntimeError as exc:
@@ -366,18 +367,18 @@ def test_missing_credentials_fail_fast():
     raise AssertionError("missing credentials did not fail fast")
 
 
-# ── OAuth token minting ───────────────────────────────────────────────────────
+# ── Token minting ─────────────────────────────────────────────────────────────
 #
-# The bug these pin: the SDK sends `api_key` verbatim as `Authorization: Bearer`,
-# so handing it the raw client id returns AUTH_FAILED. What must reach it is the
-# access token from the client_credentials exchange.
+# The bug these pin: the SDK sends `service_account_token` verbatim as
+# `Authorization: Bearer`, so handing it the raw client id returns AUTH_FAILED.
+# What must reach it is the access token from the client_credentials exchange.
 
 def _install_oauth_fake(token_responses):
     """Backend wired to fake OAuth + fake SDK. Returns (backend, state)."""
     for var in ("AGENTIC_MEMORY_API_KEY", "AGENTIC_MEMORY_BASE_URL"):
         os.environ.pop(var, None)
-    os.environ["MAGENTA_CLIENT_ID"] = "client-id-not-a-token"
-    os.environ["MAGENTA_CLIENT_SECRET"] = "client-secret"
+    os.environ["AGENT_ENGINE_CLIENT_ID"] = "client-id-not-a-token"
+    os.environ["AGENT_ENGINE_CLIENT_SECRET"] = "client-secret"
     os.environ["AGENTIC_MEMORY_PROJECT_ID"] = "test-project"
 
     state = {"posts": [], "keys": []}
@@ -397,9 +398,10 @@ def _install_oauth_fake(token_responses):
         return FakeResponse(token_responses[min(len(state["posts"]) - 1,
                                                 len(token_responses) - 1)])
 
-    def factory(*, api_key=None, project_id=None, base_url=None):
-        state["keys"].append(api_key)
-        mem = FakeMemory(api_key=api_key, project_id=project_id, base_url=base_url)
+    def factory(*, service_account_token=None, project_id=None, base_url=None):
+        state["keys"].append(service_account_token)
+        mem = FakeMemory(service_account_token=service_account_token,
+                         project_id=project_id, base_url=base_url)
         state["mem"] = mem
         return mem
 
@@ -407,7 +409,7 @@ def _install_oauth_fake(token_responses):
     platform_memory.Memory = factory
     platform_memory.MemoryRequestContext = FakeCtx
     platform_memory._SDK_IMPORT_ERROR = None
-    return platform_memory.MagentaBackend(), state
+    return platform_memory.AgentEngineBackend(), state
 
 
 def test_sdk_receives_the_token_not_the_client_id():

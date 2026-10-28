@@ -1,5 +1,10 @@
 # Plan: Add Agentic Platform Memory to the Multi-Agent RIV Workshop
 
+> **Historical document.** "Magenta" / "Agentic Platform" was renamed to
+> **MongoDB Atlas Agent Engine** at public preview. Current naming, SDK
+> (`agent-engine-sdk-memory`), and endpoints are in
+> `docs/atlas-agent-engine-rename-spec.md`.
+
 ## Objective
 
 Add [`agentic-platform-memory`](/Users/anuj.panchal/Documents/Work/Magenta-Client-Libs/magenta-client-libraries/packages/agentic-platform-memory)

@@ -22,9 +22,9 @@ _MIN_THINKING_BUDGET = 1024
 _DEFAULT_THINKING_BUDGET = 1024
 
 # Long-term memory backends an agent may select in its `memory.backend`.
-#   atlas   — the built-in Atlas fact store (LLM extraction + vector search).
-#   magenta — the managed Magenta Memory service, via agentic-platform-memory.
-_MEMORY_BACKENDS = ("atlas", "magenta")
+#   atlas  — the built-in Atlas fact store (LLM extraction + vector search).
+#   engine — the Atlas Agent Engine memory service, via agent-engine-sdk-memory.
+_MEMORY_BACKENDS = ("atlas", "engine")
 _DEFAULT_MEMORY_BACKEND = "atlas"
 
 
@@ -42,7 +42,7 @@ class AgentDef:
     short_term: bool
     long_term: bool
     # Which long-term memory backend this agent uses: "atlas" (default, the
-    # built-in Atlas fact store) or "magenta" (the managed Magenta Memory
+    # built-in Atlas fact store) or "engine" (the Atlas Agent Engine memory
     # service). Only meaningful when long_term is True.
     long_term_backend: str
     # 0 means no extended thinking, and therefore no reasoning stream: Bedrock
@@ -96,7 +96,7 @@ def _memory_backend(agent_id: str, memory: dict) -> str:
     """The long-term backend named in `memory.backend`, defaulting to atlas.
 
     A typo here would otherwise fall through to the atlas backend silently and an
-    attendee would wonder why `magenta` never engaged — so an unknown value is an
+    attendee would wonder why `engine` never engaged — so an unknown value is an
     error at load, in the same fail-fast spirit as `_thinking_budget`.
     """
     backend = memory.get("backend", _DEFAULT_MEMORY_BACKEND)

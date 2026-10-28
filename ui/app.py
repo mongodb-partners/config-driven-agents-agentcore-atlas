@@ -286,7 +286,7 @@ def render_trace(events: list[dict], trace_id: str) -> None:
 
         with tab_memory:
             # Which long-term backend answered this turn — atlas (the built-in
-            # Atlas fact store) or magenta (the managed Magenta Memory service).
+            # Atlas fact store) or engine (the Atlas Agent Engine memory service).
             backend = next(
                 (ev.get("backend") for ev in events
                  if ev.get("kind") in ("memory.recall", "memory.extract") and ev.get("backend")),
@@ -310,10 +310,9 @@ def render_trace(events: list[dict], trace_id: str) -> None:
                 if ev.get("kind") == "memory.write" and ev.get("error"):
                     st.caption(f"Memory write degraded: {ev['error']}")
                 if ev.get("kind") == "memory.short_term":
-                    st.caption(f"AgentCore short-term memory: {ev.get('turns', 0)} turn(s) loaded")
+                    st.caption(f"Bedrock short-term memory: {ev.get('turns', 0)} turn(s) loaded")
             st.caption("With the `atlas` backend, long-term facts and chat messages live in "
-                       "Atlas; with `magenta`, they live in the managed Magenta Memory "
-                       "service. Short-term turns live in the AgentCore Memory service in "
+                       "Atlas service. Short-term turns live in the Bedrock Memory service in "
                        "both cases.")
 
         with tab_raw:
@@ -436,7 +435,7 @@ with st.sidebar:
 
 st.title("Multi-agent career assistant")
 st.caption("Orchestrator routes to a specialist. Every Atlas read goes through the "
-           "MongoDB MCP server on its own AgentCore Runtime.")
+           "MongoDB MCP server")
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):

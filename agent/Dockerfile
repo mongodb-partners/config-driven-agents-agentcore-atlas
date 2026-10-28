@@ -16,15 +16,15 @@ ENV PYTHONUNBUFFERED=1 \
 COPY agent/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ── Magenta Memory SDK, from the private registry ─────────────────────────────
-# `agentic-platform-memory` is not on PyPI. It is served from the Agentic
-# Platform's package index, which authenticates with a short-lived OAuth token
-# minted from a client id/secret pair.
+# ── Atlas Agent Engine Memory SDK, from the private registry ─────────────────
+# `agent-engine-sdk-memory` is not on PyPI. It is served from the Atlas Agent
+# Engine's package index, which authenticates with a short-lived access token
+# minted from a service-account client id/secret pair.
 #
 # Both arrive as BuildKit secrets — never build args, which are substituted into
 # the image history in plaintext. The client id is as sensitive as the secret:
-# it doubles as the runtime credential for the Memory service (agentcore.tf
-# feeds it to AGENTIC_MEMORY_API_KEY).
+# it doubles as the runtime credential for the memory service (agentcore.tf
+# feeds both to the runtimes as AGENT_ENGINE_CLIENT_ID / AGENT_ENGINE_CLIENT_SECRET).
 #
 # The fingerprint IS a build arg, and exists only to be one. BuildKit
 # deliberately keeps secret *contents* out of the cache key, so a build with
@@ -33,30 +33,34 @@ RUN pip install --no-cache-dir -r requirements.txt
 # carrying the id.
 #
 # No credentials → the package is skipped and the image still builds. Only agents
-# with `memory.backend: magenta` need it, and platform_memory.py already degrades
+# with `memory.backend: engine` need it, and platform_memory.py already degrades
 # with a clear message when the import is missing.
-ARG MAGENTA_CREDS_FINGERPRINT=""
-RUN --mount=type=secret,id=magenta_client_id \
-    --mount=type=secret,id=magenta_client_secret \
+#
+# ponytail: no version pin yet — the published versions of the public-preview
+# package are unknown until the first authenticated build. Pin tight (==x.y.z)
+# once one is recorded; the preview docs warn of breaking changes.
+ARG AGENT_ENGINE_CREDS_FINGERPRINT=""
+RUN --mount=type=secret,id=agent_engine_client_id \
+    --mount=type=secret,id=agent_engine_client_secret \
     set -eu; \
-    echo "magenta creds fingerprint: ${MAGENTA_CREDS_FINGERPRINT:-none}"; \
-    if [ ! -s /run/secrets/magenta_client_id ] || [ ! -s /run/secrets/magenta_client_secret ]; then \
-      echo "No Magenta credentials — skipping agentic-platform-memory. Agents with"; \
-      echo "memory.backend: magenta will fail on their first turn; atlas agents are unaffected."; \
+    echo "agent engine creds fingerprint: ${AGENT_ENGINE_CREDS_FINGERPRINT:-none}"; \
+    if [ ! -s /run/secrets/agent_engine_client_id ] || [ ! -s /run/secrets/agent_engine_client_secret ]; then \
+      echo "No Agent Engine credentials — skipping agent-engine-sdk-memory. Agents with"; \
+      echo "memory.backend: engine will fail on their first turn; atlas agents are unaffected."; \
       exit 0; \
     fi; \
     apt-get update; \
     apt-get install -y --no-install-recommends curl jq; \
-    CLIENT_ID="$(cat /run/secrets/magenta_client_id)"; \
-    CLIENT_SECRET="$(cat /run/secrets/magenta_client_secret)"; \
-    ACCESS_TOKEN=$(curl -sf -X POST https://agentic-platform.mongodb.com/api/v1/oauth/token \
+    CLIENT_ID="$(cat /run/secrets/agent_engine_client_id)"; \
+    CLIENT_SECRET="$(cat /run/secrets/agent_engine_client_secret)"; \
+    ACCESS_TOKEN=$(curl -sf -X POST https://agentengine.mongodb.com/api/v1/oauth/token \
       -d "grant_type=client_credentials&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET" \
       | jq -r .access_token); \
     [ -n "$ACCESS_TOKEN" ] && [ "$ACCESS_TOKEN" != "null" ] || \
-      { echo "ERROR: Magenta token request failed — check magenta_client_id/secret." >&2; exit 1; }; \
+      { echo "ERROR: Agent Engine token request failed — check agent_engine_client_id/secret." >&2; exit 1; }; \
     pip install --no-cache-dir uv; \
-    uv pip install --system "agentic-platform-memory>=0.8.0,<0.9" \
-      --extra-index-url "https://ignore:${ACCESS_TOKEN}@agentic-platform.mongodb.com/api/v1/packages/python/simple/"; \
+    uv pip install --system "agent-engine-sdk-memory" \
+      --extra-index-url "https://ignore:${ACCESS_TOKEN}@agentengine.mongodb.com/api/v1/packages/python/simple"; \
     apt-get purge -y curl jq; apt-get autoremove -y; rm -rf /var/lib/apt/lists/*
 
 COPY agent/*.py ./

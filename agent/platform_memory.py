@@ -1,10 +1,10 @@
-"""The `magenta` long-term memory backend — Magenta Memory via its SDK.
+"""The `engine` long-term memory backend — Atlas Agent Engine memory via its SDK.
 
 This is the alternative to the built-in Atlas backend in `memory.py`. An agent
-opts in with `memory.backend: magenta` in its `.agent.md`; nothing here runs for
+opts in with `memory.backend: engine` in its `.agent.md`; nothing here runs for
 an `atlas` agent.
 
-It wraps `agentic_platform_memory.Memory` behind the same small seam the Atlas
+It wraps `agent_engine_sdk_memory.Memory` behind the same small seam the Atlas
 backend exposes (`recall` / `persist` / `short_term`), so `main.py` stays
 backend-agnostic and the UI's Memory tab keeps rendering the same trace events.
 
@@ -26,19 +26,23 @@ from dataclasses import dataclass, field
 
 import httpx
 
-# The SDK is an optional dependency in spirit: only `magenta` agents need it, and
+# The SDK is an optional dependency in spirit: only `engine` agents need it, and
 # the import is deferred so an `atlas`-only deployment that never installed it
 # still imports this module cleanly. `_require_sdk()` raises a clear message.
+#
+# Only `MemoryIdentityError` is a doc-confirmed exception name. The SDK has a
+# typed transport-error family in errors.py but the docs do not enumerate the
+# class names — so resolve them with getattr and fall back to Exception. A name
+# the SDK renamed then degrades to the generic guards below instead of raising
+# ImportError here.
 try:  # pragma: no cover - import wiring, exercised indirectly
-    from agentic_platform_memory import (
-        Memory,
-        MemoryRequestContext,
-        MemoryAPIError,
-        MemoryAuthError,
-        MemoryClientError,
-        MemoryIdentityError,
-    )
+    import agent_engine_sdk_memory as _sdk
+    from agent_engine_sdk_memory import Memory, MemoryRequestContext
 
+    MemoryAuthError = getattr(_sdk, "MemoryAuthError", Exception)
+    MemoryAPIError = getattr(_sdk, "MemoryAPIError", Exception)
+    MemoryClientError = getattr(_sdk, "MemoryClientError", Exception)
+    MemoryIdentityError = getattr(_sdk, "MemoryIdentityError", Exception)
     _SDK_IMPORT_ERROR: Exception | None = None
 except Exception as exc:  # noqa: BLE001 - surface at use, not at import
     Memory = None  # type: ignore[assignment]
@@ -55,7 +59,7 @@ _CONTEXT_MAX_TOKENS = int(os.environ.get("AGENTIC_MEMORY_MAX_TOKENS", "2048"))
 # Where the OAuth client_credentials exchange happens. The same endpoint the
 # image build uses to reach the private package registry — one platform, one
 # client, two uses.
-_TOKEN_URL = "https://agentic-platform.mongodb.com/api/v1/oauth/token"
+_TOKEN_URL = "https://agentengine.mongodb.com/api/v1/oauth/token"
 
 # Re-mint this many seconds before the token actually expires, so a turn never
 # starts with a credential that dies mid-flight.
@@ -90,7 +94,7 @@ class RecallResult:
 class PersistResult:
     """What a persist wrote, mirroring the atlas backend's trace surface.
 
-    `messages` is how many turn halves were recorded; the magenta service does
+    `messages` is how many turn halves were recorded; the engine service does
     its own durable extraction server-side, so there is no local extraction
     token usage to report (unlike the atlas backend's second Bedrock call).
     """
@@ -99,14 +103,14 @@ class PersistResult:
     error: str = ""
 
 
-class MagentaBackend:
-    """The `magenta` long-term backend over `agentic_platform_memory.Memory`.
+class AgentEngineBackend:
+    """The `engine` long-term backend over `agent_engine_sdk_memory.Memory`.
 
     One `Memory` instance per process; `bind(...)` per turn scopes it to the
     (user, session) identity. Thread-safe across users for that reason.
     """
 
-    name = "magenta"
+    name = "engine"
 
     def __init__(self) -> None:
         self._memory = None  # lazily constructed on first use
@@ -119,20 +123,20 @@ class MagentaBackend:
     def _require_sdk(self):
         if Memory is None:
             raise RuntimeError(
-                "memory.backend 'magenta' needs the agentic-platform-memory package, "
+                "memory.backend 'engine' needs the agent-engine-sdk-memory package, "
                 f"which failed to import: {_SDK_IMPORT_ERROR}. Add it to "
                 "agent/requirements.txt, or switch the agent to memory.backend: atlas."
             )
 
     def _mint_token(self) -> str:
-        """Exchange the OAuth client credentials for a bearer token.
+        """Exchange the service-account credentials for an access token.
 
-        The SDK sends whatever it is handed as `api_key` verbatim, as
-        `Authorization: Bearer <value>`. So what it needs is an access token —
+        The SDK sends whatever it is handed as `service_account_token` verbatim,
+        as `Authorization: Bearer <value>`. So what it needs is an access token —
         handing it the raw client id is what produces AUTH_FAILED.
         """
-        client_id = os.environ.get("MAGENTA_CLIENT_ID", "").strip()
-        client_secret = os.environ.get("MAGENTA_CLIENT_SECRET", "").strip()
+        client_id = os.environ.get("AGENT_ENGINE_CLIENT_ID", "").strip()
+        client_secret = os.environ.get("AGENT_ENGINE_CLIENT_SECRET", "").strip()
         try:
             resp = httpx.post(
                 _TOKEN_URL,
@@ -147,15 +151,15 @@ class MagentaBackend:
             payload = resp.json()
         except Exception as exc:  # noqa: BLE001 - one directed message, not a stack
             raise RuntimeError(
-                f"Magenta token request to {_TOKEN_URL} failed: "
-                f"{type(exc).__name__}: {exc}. Check magenta_client_id and "
-                "magenta_client_secret."
+                f"Atlas Agent Engine token request to {_TOKEN_URL} failed: "
+                f"{type(exc).__name__}: {exc}. Check agent_engine_client_id and "
+                "agent_engine_client_secret."
             ) from exc
 
         token = (payload.get("access_token") or "").strip()
         if not token:
             raise RuntimeError(
-                f"Magenta token response from {_TOKEN_URL} carried no access_token."
+                f"Agent Engine token response from {_TOKEN_URL} carried no access_token."
             )
 
         try:
@@ -189,28 +193,28 @@ class MagentaBackend:
         base_url = os.environ.get("AGENTIC_MEMORY_BASE_URL", "").strip()
 
         # Three ways to authenticate, most specific first:
-        #   1. a pre-minted bearer token, handed over directly
-        #   2. OAuth client credentials, exchanged here for one — the hosted path
+        #   1. a pre-minted access token, handed over directly
+        #   2. service-account credentials, exchanged here for one — the hosted path
         #   3. nothing, for a self-hosted backend that does its own auth
-        api_key = os.environ.get("AGENTIC_MEMORY_API_KEY", "").strip()
-        if api_key:
+        token = os.environ.get("AGENTIC_MEMORY_API_KEY", "").strip()
+        if token:
             self._token_expires_at = float("inf")  # not ours to expire
-        elif os.environ.get("MAGENTA_CLIENT_ID", "").strip():
-            api_key = self._mint_token()
+        elif os.environ.get("AGENT_ENGINE_CLIENT_ID", "").strip():
+            token = self._mint_token()
         elif base_url:
             self._token_expires_at = float("inf")  # unauthenticated self-hosted
         else:
             raise RuntimeError(
-                "memory.backend 'magenta' needs MAGENTA_CLIENT_ID and "
-                "MAGENTA_CLIENT_SECRET (+ AGENTIC_MEMORY_PROJECT_ID for the hosted "
+                "memory.backend 'engine' needs AGENT_ENGINE_CLIENT_ID and "
+                "AGENT_ENGINE_CLIENT_SECRET (+ AGENTIC_MEMORY_PROJECT_ID for the hosted "
                 "service), a pre-minted AGENTIC_MEMORY_API_KEY, or "
                 "AGENTIC_MEMORY_BASE_URL for a self-hosted backend. None are set. "
-                "Terraform fills the first two from the magenta_client_id and "
-                "magenta_client_secret variables."
+                "Terraform fills the first two from the agent_engine_client_id and "
+                "agent_engine_client_secret variables."
             )
 
         self._memory = Memory(
-            api_key=api_key or None,
+            service_account_token=token or None,
             project_id=project_id or None,
             base_url=base_url or None,
         )
@@ -276,7 +280,6 @@ class MagentaBackend:
             context = session.build_context(
                 query="",
                 enabled_sources=_STM_SOURCES,
-                session_id=session_id,
                 max_tokens=_CONTEXT_MAX_TOKENS,
             )
         except Exception:  # noqa: BLE001 - short-term recall is best-effort
@@ -299,13 +302,13 @@ class MagentaBackend:
         try:
             session = self._session(user_id, session_id, agent_id)
             written = 0
+            # record_turn takes only role/content — the bound context already
+            # carries the session, so no session_id kwarg.
             if user_text.strip():
-                session.record_turn(role="user", content=user_text, session_id=session_id)
+                session.record_turn(role="user", content=user_text)
                 written += 1
             if assistant_text.strip():
-                session.record_turn(
-                    role="assistant", content=assistant_text, session_id=session_id
-                )
+                session.record_turn(role="assistant", content=assistant_text)
                 written += 1
         except MemoryAuthError as exc:
             self._invalidate()

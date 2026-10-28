@@ -230,7 +230,7 @@ def touch_session(user_id: str, session_id: str, first_message: str) -> None:
 # `memory.backend` in its `.agent.md`:
 #
 #   atlas    the functions above — LLM fact extraction + Atlas vector search.
-#   magenta  the managed Magenta Memory service (see platform_memory.py).
+#   engine   the Atlas Agent Engine memory service (see platform_memory.py).
 #
 # `get_backend(agent_def)` returns the right one so `main.py` never branches on
 # the backend name itself. The atlas backend is a thin adapter over the existing
@@ -238,7 +238,7 @@ def touch_session(user_id: str, session_id: str, first_message: str) -> None:
 
 
 class AtlasRecall:
-    """Recall result mirroring the magenta backend's shape.
+    """Recall result mirroring the engine backend's shape.
 
     `facts` is the `{"text": ...}` list `_facts_block` consumes; `formatted` is
     unused by atlas (it injects a fact list, not a pre-formatted block).
@@ -254,7 +254,7 @@ class AtlasPersist:
     """Persist result: message count plus the extraction call's own token usage.
 
     The atlas backend runs a second Bedrock call to extract durable facts, so it
-    carries `extract_usage` for the cost panel — the magenta backend has no such
+    carries `extract_usage` for the cost panel — the engine backend has no such
     local call and reports none.
     """
 
@@ -291,11 +291,11 @@ class AtlasBackend:
 def get_backend(agent_def):
     """The long-term backend for an agent, from its `long_term_backend`.
 
-    Imports the magenta backend lazily so an atlas-only deployment never touches
+    Imports the engine backend lazily so an atlas-only deployment never touches
     the SDK. Unknown names are already rejected at config load, so this only ever
     sees a validated value.
     """
-    if getattr(agent_def, "long_term_backend", "atlas") == "magenta":
+    if getattr(agent_def, "long_term_backend", "atlas") == "engine":
         import platform_memory
-        return platform_memory.MagentaBackend()
+        return platform_memory.AgentEngineBackend()
     return AtlasBackend()

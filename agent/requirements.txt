@@ -12,7 +12,8 @@ PyYAML>=6.0
 # AgentCore's built-in observability: auto-instruments the process so spans and
 # logs land in CloudWatch / X-Ray without any exporter code of ours.
 aws-opentelemetry-distro>=0.10.0
-# NOT listed here: agentic-platform-memory, the SDK behind the optional `magenta`
-# long-term memory backend. It is not on PyPI — it is served from the Agentic
-# Platform's private registry, which needs a short-lived OAuth token. The
-# Dockerfile mints that token and installs it; see the RUN block there.
+# NOT listed here: agent-engine-sdk-memory, the SDK behind the optional `engine`
+# long-term memory backend. It is not on PyPI — it is served from the Atlas Agent
+# Engine's private registry, which needs a short-lived access token minted from a
+# service account. The Dockerfile mints that token and installs it; see the RUN
+# block there.

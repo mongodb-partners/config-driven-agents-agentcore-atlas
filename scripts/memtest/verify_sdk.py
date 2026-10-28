@@ -5,8 +5,8 @@ Runs inside the deployed agent image, which already has the SDK and
 platform_memory.py — so the token is minted the same way and the secret never
 leaves your shell:
 
-    export MAGENTA_CLIENT_ID=… MAGENTA_CLIENT_SECRET=… AGENTIC_MEMORY_PROJECT_ID=…
-    docker run --rm -e MAGENTA_CLIENT_ID -e MAGENTA_CLIENT_SECRET -e AGENTIC_MEMORY_PROJECT_ID \
+    export AGENT_ENGINE_CLIENT_ID=… AGENT_ENGINE_CLIENT_SECRET=… AGENTIC_MEMORY_PROJECT_ID=…
+    docker run --rm -e AGENT_ENGINE_CLIENT_ID -e AGENT_ENGINE_CLIENT_SECRET -e AGENTIC_MEMORY_PROJECT_ID \
       -v "$PWD/scripts/memtest:/t:ro" \
       979559056307.dkr.ecr.us-east-1.amazonaws.com/auto-embed-byoc-riv-workshop/agent:latest \
       python /t/verify_sdk.py --user qa-mem-20260915-1-a --session sess-qa-mem-20260915-1-a-s1-000000000000 --needle Halcyon
@@ -46,7 +46,7 @@ def main() -> int:
     ap.add_argument("--needle", default="Halcyon")
     args = ap.parse_args()
 
-    backend = platform_memory.MagentaBackend()
+    backend = platform_memory.AgentEngineBackend()
     mem = backend._client()
     # O2: the TTL the service actually granted. _token_expires_at is monotonic
     # and already has the skew subtracted.
