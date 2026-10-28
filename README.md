@@ -25,9 +25,12 @@ flowchart TB
         acm[("AgentCore Memory<br/>short-term turns")]
     end
 
+    aae["<b>Atlas Agent Engine</b> · agentengine.mongodb.com<br/>managed long-term memory<br/>recall · record_turn · server-side extraction"]
+
     subgraph atlas["MongoDB Atlas"]
         dom[("<b>domain + vector</b><br/>jobs · companies · candidates<br/>career_paths · skills_taxonomy<br/>compensation_data")]
-        ltm[("<b>long-term memory</b><br/>agent_facts<br/>chat_messages · chat_sessions")]
+        ltm[("<b>long-term memory — `atlas` backend</b><br/>agent_facts<br/>chat_messages · chat_sessions")]
+        memdb[("<b>engine memory store</b><br/>written by the Agent Engine<br/>memory service, not the agents")]
         trc[("<b>agent_traces</b>")]
     end
 
@@ -52,6 +55,12 @@ flowchart TB
     mcpr --> ltm
     mcpr --> trc
 
+    orch -->|"engine backend: agent-engine-sdk-memory · bearer token"| aae
+    cc --> aae
+    jm --> aae
+    ci --> aae
+    aae -->|"persists memory docs server-side"| memdb
+
     orch <-.-> acm
     orch -.->|"handoff target"| ssm
     orch -.->|"Converse · every agent"| models
@@ -66,16 +75,19 @@ flowchart TB
     classDef mdb fill:#e6f6ec,stroke:#2f8f5b,stroke-width:1px,color:#0b2e1c
     classDef side fill:#f5f2ec,stroke:#9a8465,stroke-width:1px,color:#2f2718
     class orch,cc,jm,ci,mcpr,acm,models aws
-    class dom,ltm,trc mdb
+    class dom,ltm,memdb,trc,aae mdb
     class ui,ssm,sec,cw,browser side
 ```
 
 **Five AgentCore runtimes**, each with its own compute and its own IAM role. Two
 architectural choices worth naming:
 
-- **No MongoDB driver in the agent image.** Every read and write — agent tool
-  calls, memory, trace flushes — goes through the MCP runtime. The dashed line
-  from the UI to Atlas is the one exception: it is a read-only `pymongo`
+- **No MongoDB driver in the agent image.** Domain reads, trace flushes, and —
+  for the `atlas` backend — memory writes all go through the MCP runtime. The one
+  exception inside the agents is the `engine` backend: long-term memory goes
+  straight to the **Atlas Agent Engine** memory service over its SDK, and that
+  service persists into your Atlas cluster server-side. The dashed line
+  from the UI to Atlas is a separate read-only `pymongo`
   connection for the session list and trace panel, and the UI is not an agent.
 
 ---
@@ -268,9 +280,9 @@ memory:
 | `engine` | The **Atlas Agent Engine** memory service, via the `agent-engine-sdk-memory` SDK ([docs](https://www.mongodb.com/docs/agentengine/add-features/memory-only/)). The framework records each turn and asks the service for relevant context; extraction and storage are handled server-side. |
 
 Switching is config-only: change `backend`, re-run `./deploy.sh`, and no Python
-changes. Every existing agent omits `backend` and so keeps using `atlas` — the
-default is unchanged. Short-term memory is the AgentCore buffer in both cases;
-only the long-term recall/persist path differs.
+changes. On this branch all four shipped agents set `backend: engine`; omitting
+`backend` defaults an agent to `atlas`. Short-term memory is the AgentCore buffer
+in both cases; only the long-term recall/persist path differs.
 
 The `engine` backend authenticates with an Atlas Agent Engine **service
 account** (see PRE_REQUISITES.md §2.6 for provisioning). Set
