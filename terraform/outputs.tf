@@ -3,6 +3,11 @@ output "ui_url" {
   value       = "http://${aws_instance.ui.public_ip}:8501"
 }
 
+output "ui_port_forward_command" {
+  description = "Reach the UI at http://localhost:8501 without opening a port (needs the SSM plugin)."
+  value       = "aws ssm start-session --target ${aws_instance.ui.id} --region ${var.aws_region} --document-name AWS-StartPortForwardingSession --parameters portNumber=8501,localPortNumber=8501"
+}
+
 output "agent_runtimes" {
   description = "Every agent, from config/agents/*.agent.md. Add a file, re-apply, it appears here."
   value = {

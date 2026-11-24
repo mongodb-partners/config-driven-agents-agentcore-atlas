@@ -211,9 +211,12 @@ get right — `./deploy.sh` prints this list back at you before deploying:
 - **Network access.** The Atlas project must allow the AgentCore runtimes and the
   EC2 instance in. Those have no fixed egress IPs, so `0.0.0.0/0` is what the
   managed path uses. Atlas → Network Access → Add IP Address.
-- **A database user** with `readWrite` on your `mongodb_db` **and** `atlasAdmin`
-  on `admin`. The seed creates Atlas Search indexes, which `readWrite` alone
-  cannot do. Put its username and password in the URI.
+- **A database user** with `readWrite` on your `mongodb_db` only, in
+  `mongodb_uri`. Every agent reaches Atlas through the MCP server as this user.
+- **A seed user** with `atlasAdmin` on `admin`, in `mongodb_seed_uri`. The seed
+  creates Atlas Search indexes, which `readWrite` alone cannot do; only the EC2
+  box reads this one. Omit it and the seed reuses `mongodb_uri` — which then
+  needs `atlasAdmin`, handing cluster-admin to every agent.
 - **Tier.** The stack builds 7 vector indexes, so M0 (limit 3) will not work.
   `embedding_mode = "auto"` additionally needs M10+ with storage auto-scaling on.
 - **The data.** The seed upserts into the `mongodb_db` database (`riv_workshop`

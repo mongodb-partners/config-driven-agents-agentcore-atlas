@@ -47,8 +47,11 @@ variable "mongodb_uri" {
     What you own when you bring your own:
       - network access — the Atlas project must allow the agent runtimes and the
         EC2 instance in (0.0.0.0/0 is what the managed path uses)
-      - a database user with readWrite on `mongodb_db` and atlasAdmin on admin,
-        which the seed needs to create Search indexes
+      - a database user with readWrite on `mongodb_db` only. Every agent reaches
+        Atlas through the MCP server as this user, so keep it that narrow.
+      - an admin user for the seed (Search index creation) in mongodb_seed_uri.
+        Leave that empty and the seed reuses this URI, which then needs
+        atlasAdmin — and so does every agent.
       - the tier — this stack builds 7 vector indexes, so M0 (limit 3) will not
         do, and embedding_mode = "auto" needs M10+ with storage auto-scaling
       - the data — `destroy` leaves your cluster and its collections alone
@@ -65,6 +68,22 @@ variable "mongodb_uri" {
   validation {
     condition     = var.mongodb_uri != "" || (var.atlas_org_id != "" && var.atlas_public_key != "" && var.atlas_private_key != "")
     error_message = "Without mongodb_uri, Terraform creates the cluster and needs atlas_org_id, atlas_public_key, and atlas_private_key. Set those, or set mongodb_uri to use a cluster you already have."
+  }
+}
+
+variable "mongodb_seed_uri" {
+  description = <<-EOT
+    Bring-your-own only. Connection string for a user with atlasAdmin on admin,
+    used once by the seed to create Search indexes. Read by the EC2 box at first
+    boot, never by the agents. Empty reuses mongodb_uri.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+
+  validation {
+    condition     = var.mongodb_seed_uri == "" || can(regex("^mongodb(\\+srv)?://[^:]+:[^@]+@", var.mongodb_seed_uri))
+    error_message = "mongodb_seed_uri must be a full connection string with credentials."
   }
 }
 
@@ -230,8 +249,9 @@ variable "agent_engine_client_id" {
         agent_engine_client_secret) for a short-lived token and installs
         `agent-engine-sdk-memory` from the private package registry.
       · run time   — the runtimes repeat that exchange to authenticate the
-        Memory SDK itself, so both values reach them as AGENT_ENGINE_CLIENT_ID
-        and AGENT_ENGINE_CLIENT_SECRET.
+        Memory SDK itself. Both values are stored in the app-credentials secret
+        and loaded into AGENT_ENGINE_CLIENT_ID / AGENT_ENGINE_CLIENT_SECRET at
+        runtime startup — never set as runtime environment variables.
 
     Create the service account with
     `agentengine service-account create ... --role PROJECT_OWNER`; Magenta-era
@@ -276,9 +296,18 @@ variable "ec2_instance_type" {
 
 variable "ui_allowed_cidr" {
   description = <<-EOT
-    CIDR allowed to reach the UI on port 8501. Defaults to open because attendees
-    join from arbitrary networks; narrow it to your own IP/32 if you can.
+    CIDR allowed to reach the UI on port 8501. The UI has no login, so this is its
+    only gate. deploy.sh fills it with the deployer's public IP/32 when unset.
+
+    Empty opens no port at all: reach the UI through SSM port forwarding instead
+    (the `ui_port_forward_command` output). Never 0.0.0.0/0 — anyone who finds
+    the IP could drive the agents on your AWS bill.
   EOT
   type        = string
-  default     = "0.0.0.0/0"
+  default     = ""
+
+  validation {
+    condition     = var.ui_allowed_cidr == "" || (can(cidrhost(var.ui_allowed_cidr, 0)) && !endswith(var.ui_allowed_cidr, "/0"))
+    error_message = "ui_allowed_cidr must be a CIDR narrower than /0 (e.g. 203.0.113.7/32), or empty for SSM port forwarding only."
+  }
 }

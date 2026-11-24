@@ -1,7 +1,9 @@
 # Upper bounds are deliberate. A workshop stack that was built and verified on
 # one day must build identically on the day it is taught — an unpinned major
 # release is a live-demo failure with no time to debug it.
-bedrock-agentcore>=0.1.0,<1
+# >=1.18.1: CVE-2026-16796 (GHSA-j6g5-3hh3-pgw8). Verified on 1.27: same
+# BedrockAgentCoreApp streaming contract and MemoryClient signatures we use.
+bedrock-agentcore>=1.18.1,<2
 strands-agents>=1.0.0,<2
 # mcp 2.0.0 renamed streamablehttp_client -> streamable_http_client, which breaks
 # mongo_mcp.py's import outright.

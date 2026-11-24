@@ -109,6 +109,31 @@ def test_the_result_still_comes_through():
     assert result["toolUseId"] == "tu-1"
 
 
+def test_app_secret_fills_env_without_overriding_it():
+    """Credentials come from Secrets Manager, not runtime env vars (F3). Empty
+    values are skipped and an explicit env var wins."""
+    secret = {"VOYAGE_API_KEY": "from-secret", "AGENT_ENGINE_CLIENT_ID": "",
+              "AGENT_ENGINE_CLIENT_SECRET": "sk-from-secret"}
+    fake = types.SimpleNamespace(get_secret_value=lambda SecretId: {"SecretString": json.dumps(secret)})
+    keys = ("APP_SECRET_ARN", *secret)
+    saved = {k: os.environ.pop(k, None) for k in keys}
+    real_client = main.boto3.client
+    try:
+        os.environ["APP_SECRET_ARN"] = "arn:aws:secretsmanager:us-east-1:0:secret:x"
+        os.environ["AGENT_ENGINE_CLIENT_SECRET"] = "explicit"
+        main.boto3.client = lambda *a, **k: fake
+        main._load_app_secret()
+        assert os.environ["VOYAGE_API_KEY"] == "from-secret"
+        assert "AGENT_ENGINE_CLIENT_ID" not in os.environ
+        assert os.environ["AGENT_ENGINE_CLIENT_SECRET"] == "explicit"
+    finally:
+        main.boto3.client = real_client
+        for k, v in saved.items():
+            os.environ.pop(k, None)
+            if v is not None:
+                os.environ[k] = v
+
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):

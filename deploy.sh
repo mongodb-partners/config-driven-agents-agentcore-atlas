@@ -87,8 +87,14 @@ if [ "$BYO_ATLAS" -eq 1 ]; then
   bold "Atlas: using the cluster in mongodb_uri — nothing will be created or destroyed."
   echo "  It needs to already have:"
   echo "    · network access allowing the AgentCore runtimes and this stack's EC2 box"
-  echo "    · a user with readWrite on '$MONGODB_DB' and atlasAdmin on admin"
-  echo "      (the seed creates Atlas Search indexes, which readWrite cannot do)"
+  echo "    · a user with readWrite on '$MONGODB_DB' only, in mongodb_uri (every agent uses it)"
+  if [ -n "$(tfvar mongodb_seed_uri)" ]; then
+    echo "    · a user with atlasAdmin on admin, in mongodb_seed_uri (seed only)"
+  else
+    echo "    · mongodb_seed_uri unset: the seed reuses mongodb_uri, so that user needs"
+    echo "      atlasAdmin too — and every agent then connects with it. Set"
+    echo "      mongodb_seed_uri to keep the agents' user at readWrite."
+  fi
   echo "    · room for 7 vector indexes — M0 allows 3"
   echo "  The seed upserts into '$MONGODB_DB'; it does not touch other databases."
 else
@@ -183,6 +189,29 @@ esac
 green "Embedding mode: $EMBEDDING_MODE"
 echo
 
+# ── UI access ─────────────────────────────────────────────────────────────────
+#
+# The UI has no login, so the security group is its only gate. Unless tfvars
+# pins ui_allowed_cidr, open it to this machine's public IP and nothing else.
+
+if grep -qE '^[[:space:]]*ui_allowed_cidr[[:space:]]*=' "$TF_DIR/terraform.tfvars"; then
+  UI_CIDR="$(tfvar ui_allowed_cidr)"
+else
+  MY_IP="$(curl -fsS --max-time 5 https://checkip.amazonaws.com | tr -d '[:space:]' || true)"
+  if [[ "$MY_IP" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+    UI_CIDR="$MY_IP/32"
+  else
+    UI_CIDR=""
+  fi
+  export TF_VAR_ui_allowed_cidr="$UI_CIDR"
+fi
+if [ -n "$UI_CIDR" ]; then
+  green "UI access: port 8501 open to $UI_CIDR only"
+else
+  echo "UI access: no port opened — use the ui_port_forward_command output to reach it."
+fi
+echo
+
 # ── Deploy ────────────────────────────────────────────────────────────────────
 
 bold "Enabling CloudWatch Transaction Search (AgentCore end-to-end traces)…"
@@ -213,5 +242,9 @@ green "━━ Deployed ━━"
 terraform -chdir="$TF_DIR" output
 echo
 bold "The UI answers once seeding finishes (~5 min after the instance boots)."
+if [ -z "$UI_CIDR" ]; then
+  echo "Open it:   $(terraform -chdir="$TF_DIR" output -raw ui_port_forward_command)"
+  echo "           then browse to http://localhost:8501"
+fi
 echo "Watch it:  $(terraform -chdir="$TF_DIR" output -raw ssh_session_command)"
 echo "           sudo tail -f /var/log/riv-seed.log"

@@ -65,6 +65,29 @@ resource "aws_bedrockagentcore_agent_runtime" "mcp" {
 
 # ── Agents ────────────────────────────────────────────────────────────────────
 
+# API credentials the agents (and the seed) need, as one JSON secret whose keys
+# are the environment variable names they are loaded into. Empty values are
+# skipped by the loader, so an unused key costs nothing.
+#
+# Agent Engine: only consumed by agents with `memory.backend: engine`, but
+# present for all so switching backends stays a config-only change. The Memory
+# SDK needs an access token, which platform_memory.py mints from these two at
+# run time — the same client_credentials exchange the image build uses.
+resource "aws_secretsmanager_secret" "app" {
+  name                    = "${var.project_name}/app-credentials"
+  description             = "Voyage and Atlas Agent Engine credentials for the agent runtimes"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret_version" "app" {
+  secret_id = aws_secretsmanager_secret.app.id
+  secret_string = jsonencode({
+    VOYAGE_API_KEY             = var.voyage_api_key
+    AGENT_ENGINE_CLIENT_ID     = var.agent_engine_client_id
+    AGENT_ENGINE_CLIENT_SECRET = var.agent_engine_client_secret
+  })
+}
+
 resource "aws_bedrockagentcore_agent_runtime" "agents" {
   for_each = local.agents
 
@@ -97,20 +120,10 @@ resource "aws_bedrockagentcore_agent_runtime" "agents" {
       EMBEDDING_MODE      = var.embedding_mode
       VOYAGE_EMBED_MODEL  = var.voyage_embed_model
     },
-    var.voyage_api_key == "" ? {} : {
-      VOYAGE_API_KEY = var.voyage_api_key
-    },
-    # Atlas Agent Engine memory credentials — only consumed by agents with
-    # `memory.backend: engine`. Injected into every runtime (harmless to an
-    # atlas agent, which never reads them) so switching backends stays a
-    # config-only change with no redeploy of Terraform variables.
-    # The Memory SDK sends its credential verbatim as a bearer token, so it needs
-    # an access token rather than a client id. platform_memory.py mints one at
-    # run time from these two — the same client_credentials exchange the image
-    # build uses to reach the private package registry.
-    var.agent_engine_client_id == "" ? {} : {
-      AGENT_ENGINE_CLIENT_ID     = var.agent_engine_client_id
-      AGENT_ENGINE_CLIENT_SECRET = var.agent_engine_client_secret
+    # Credentials are not here: environment variables are readable by anyone
+    # with GetAgentRuntime. main.py loads them from this secret at startup.
+    {
+      APP_SECRET_ARN = aws_secretsmanager_secret.app.arn
     },
     var.agentic_memory_project_id == "" ? {} : {
       AGENTIC_MEMORY_PROJECT_ID = var.agentic_memory_project_id
@@ -123,6 +136,7 @@ resource "aws_bedrockagentcore_agent_runtime" "agents" {
   depends_on = [
     null_resource.build_agent,
     aws_iam_role_policy.agent_runtime,
+    aws_secretsmanager_secret_version.app,
   ]
 }
 

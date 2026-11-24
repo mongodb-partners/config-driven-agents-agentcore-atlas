@@ -144,6 +144,13 @@ data "aws_iam_policy_document" "agent_runtime" {
   }
 
   statement {
+    sid       = "ReadAppCredentials"
+    effect    = "Allow"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.app.arn]
+  }
+
+  statement {
     sid     = "ReadRuntimeMap"
     effect  = "Allow"
     actions = ["ssm:GetParameter"]
@@ -205,18 +212,29 @@ data "aws_iam_policy_document" "ec2_assume" {
 }
 
 data "aws_iam_policy_document" "ec2" {
+  # The orchestrator only: the UI must not be able to call a specialist or the
+  # MCP runtime directly and skip the agents in between.
   statement {
-    sid       = "InvokeOrchestrator"
-    effect    = "Allow"
-    actions   = ["bedrock-agentcore:InvokeAgentRuntime"]
-    resources = ["arn:aws:bedrock-agentcore:${var.aws_region}:${data.aws_caller_identity.current.account_id}:runtime/*"]
+    sid     = "InvokeOrchestrator"
+    effect  = "Allow"
+    actions = ["bedrock-agentcore:InvokeAgentRuntime"]
+    resources = [
+      aws_bedrockagentcore_agent_runtime.agents[local.orchestrator_id].agent_runtime_arn,
+      "${aws_bedrockagentcore_agent_runtime.agents[local.orchestrator_id].agent_runtime_arn}/*",
+    ]
   }
 
+  # mongodb_uri for the UI; the admin seed URI and the Voyage key for the
+  # first-boot seed.
   statement {
-    sid       = "ReadAtlasCredentials"
-    effect    = "Allow"
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.mongodb_uri.arn]
+    sid     = "ReadAtlasCredentials"
+    effect  = "Allow"
+    actions = ["secretsmanager:GetSecretValue"]
+    resources = [
+      aws_secretsmanager_secret.mongodb_uri.arn,
+      aws_secretsmanager_secret.mongodb_seed_uri.arn,
+      aws_secretsmanager_secret.app.arn,
+    ]
   }
 
   statement {

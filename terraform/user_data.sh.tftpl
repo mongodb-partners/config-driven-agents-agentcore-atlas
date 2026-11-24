@@ -23,21 +23,31 @@ MONGODB_DB=${mongodb_db}
 MONGODB_URI_SECRET_ARN=${mongodb_secret_arn}
 WORKSHOP_USER_ID=workshop-user
 EMBEDDING_MODE=${embedding_mode}
-VOYAGE_API_KEY=${voyage_api_key}
 VOYAGE_EMBED_MODEL=${voyage_embed_model}
 ENVEOF
-chmod 0644 /etc/riv-workshop.env
+# Holds no credentials (those stay in Secrets Manager), but root-only anyway:
+# systemd reads EnvironmentFile as root before dropping to User=.
+chown root:root /etc/riv-workshop.env
+chmod 0600 /etc/riv-workshop.env
 
 python3.11 -m venv /opt/riv/venv
 /opt/riv/venv/bin/pip install --quiet --upgrade pip
-/opt/riv/venv/bin/pip install --quiet -r /opt/riv/seed/requirements.txt -r /opt/riv/ui/requirements.txt
+# One hashed lock for seed + UI (they share a venv); see its header to regenerate.
+/opt/riv/venv/bin/pip install --quiet -r /opt/riv/ui/requirements.lock
 
 # ── Seed Atlas ────────────────────────────────────────────────────────────────
-set +x # keep the connection string out of the log
+# The seed connects as the atlasAdmin user (it creates Search indexes); the UI
+# and the agents never see that URI. Credentials live only in this process's
+# environment — not in user_data, not on disk.
+set +x # keep the credentials out of the log
 MONGODB_URI="$(aws secretsmanager get-secret-value \
-  --secret-id "${mongodb_secret_arn}" --region ${region} \
+  --secret-id "${mongodb_seed_secret_arn}" --region ${region} \
   --query SecretString --output text)"
-export MONGODB_URI
+VOYAGE_API_KEY="$(aws secretsmanager get-secret-value \
+  --secret-id "${app_secret_arn}" --region ${region} \
+  --query SecretString --output text \
+  | python3.11 -c 'import json,sys; print(json.load(sys.stdin).get("VOYAGE_API_KEY", ""))')"
+export MONGODB_URI VOYAGE_API_KEY
 set -x
 
 set -o allexport; . /etc/riv-workshop.env; set +o allexport
@@ -45,9 +55,10 @@ set -o allexport; . /etc/riv-workshop.env; set +o allexport
 if /opt/riv/venv/bin/python /opt/riv/seed/seed.py 2>&1 | tee /var/log/riv-seed.log; then
   echo "seed: ok"
 else
-  echo "seed: FAILED — see /var/log/riv-seed.log. Re-run with:" >&2
-  echo "  sudo -i; export MONGODB_URI=...; /opt/riv/venv/bin/python /opt/riv/seed/seed.py" >&2
+  echo "seed: FAILED — see /var/log/riv-seed.log. Re-run as in README 'Operating it'," >&2
+  echo "  using the ${mongodb_seed_secret_arn} secret for MONGODB_URI." >&2
 fi
+unset MONGODB_URI VOYAGE_API_KEY
 
 # ── Serve the UI ──────────────────────────────────────────────────────────────
 cat > /etc/systemd/system/riv-ui.service <<'SVCEOF'

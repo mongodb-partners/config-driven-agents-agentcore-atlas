@@ -16,11 +16,14 @@ atlas_private_key = "REPLACE_ME"
 #
 # Yours to get right, because nothing here manages them:
 #   · network access reaching the AgentCore runtimes and the EC2 box (0.0.0.0/0)
-#   · a user with readWrite on mongodb_db AND atlasAdmin on admin — the seed
-#     creates Atlas Search indexes, which readWrite alone cannot do
+#   · a user with readWrite on mongodb_db only — every agent connects as it
+#   · optionally, mongodb_seed_uri for a user with atlasAdmin on admin, which the
+#     seed needs to create Atlas Search indexes. Omit it and the seed reuses
+#     mongodb_uri, which then needs atlasAdmin too (and so do the agents).
 #   · a tier with room for 7 vector indexes (M0 allows 3)
 #
-# mongodb_uri = "mongodb+srv://user:password@cluster.abcde.mongodb.net/"
+# mongodb_uri      = "mongodb+srv://app-user:password@cluster.abcde.mongodb.net/"
+# mongodb_seed_uri = "mongodb+srv://admin-user:password@cluster.abcde.mongodb.net/"
 
 # The database the seed writes into, under either option. The seed upserts and
 # touches nothing else, so an existing cluster can host it alongside your data.
@@ -100,5 +103,8 @@ voyage_embed_model = "voyage-4"
 # t4g.medium or m7g.medium, or another aws_region.
 ec2_instance_type = "t4g.small"
 
-# Narrow this to your own IP/32 if your network allows it.
-ui_allowed_cidr = "0.0.0.0/0"
+# The UI has no login; this CIDR is its only gate. Leave it commented and
+# deploy.sh opens port 8501 to your current public IP/32 only. Set it to a venue
+# range if attendees share a NAT, or to "" to open no port and use the
+# ui_port_forward_command output (SSM) instead. 0.0.0.0/0 is rejected.
+# ui_allowed_cidr = "203.0.113.7/32"

@@ -70,7 +70,7 @@ fi
 # Atlas Agent Engine memory credentials, when terraform passed them in. Both go
 # in as --secret, never --build-arg: build args are substituted into the image
 # history in plaintext, and the client id is a credential in its own right —
-# agentcore.tf also feeds it to the runtime as AGENT_ENGINE_CLIENT_ID.
+# the runtimes also authenticate with it (via the app-credentials secret).
 #
 # The one build arg is a truncated hash of the id, which exists solely to give
 # the install layer a cache key. See agent/Dockerfile for why it has to.

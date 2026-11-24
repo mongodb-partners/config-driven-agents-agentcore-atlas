@@ -18,15 +18,37 @@ import uuid
 
 import boto3
 from botocore.config import Config
-from bedrock_agentcore.runtime import BedrockAgentCoreApp
-from strands import Agent, tool
-from strands.models import BedrockModel
 
-import agent_config
-import memory
-import mongo_mcp
-import tools as agent_tools
-from tracing import Trace
+
+def _load_app_secret() -> None:
+    """Pull API credentials from Secrets Manager into the environment.
+
+    Terraform passes only the secret's ARN — a credential in the runtime's
+    environment variables is readable by anyone with GetAgentRuntime. Runs before
+    the local imports so embeddings/platform_memory see the values. Explicit env
+    vars win, which keeps local runs and tests working without AWS.
+    """
+    arn = os.environ.get("APP_SECRET_ARN")
+    if not arn:
+        return
+    region = os.environ.get("AWS_REGION") or os.environ.get("AGENT_REGION")
+    raw = boto3.client("secretsmanager", region_name=region).get_secret_value(SecretId=arn)
+    for key, value in json.loads(raw["SecretString"]).items():
+        if value:
+            os.environ.setdefault(key, value)
+
+
+_load_app_secret()
+
+from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
+from strands import Agent, tool  # noqa: E402
+from strands.models import BedrockModel  # noqa: E402
+
+import agent_config  # noqa: E402
+import memory  # noqa: E402
+import mongo_mcp  # noqa: E402
+import tools as agent_tools  # noqa: E402
+from tracing import Trace  # noqa: E402
 
 AGENT = agent_config.load_agent(os.environ["AGENT_ID"])
 REGION = mongo_mcp.REGION
@@ -437,6 +459,10 @@ async def run_specialist(prompt: str, session_id: str, user_id: str, tr: Trace):
 @app.entrypoint
 async def invoke(payload: dict):
     prompt = (payload or {}).get("prompt", "").strip()
+    # ponytail: userId is trusted from the payload, so any principal allowed to
+    # InvokeAgentRuntime can act as any user's memory. Fine with one workshop
+    # user; for real users, derive it from the caller (AgentCore inbound JWT
+    # authorizer) instead.
     user_id = (payload or {}).get("userId") or "anonymous"
 
     # AgentCore rejects a runtimeSessionId under 33 chars, and the orchestrator

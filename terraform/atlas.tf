@@ -34,6 +34,11 @@ resource "random_password" "atlas_user" {
   special = false # keeps the SRV connection string free of percent-encoding
 }
 
+resource "random_password" "atlas_seed_user" {
+  length  = 28
+  special = false
+}
+
 resource "mongodbatlas_advanced_cluster" "this" {
   count = local.atlas_count
 
@@ -63,6 +68,9 @@ resource "mongodbatlas_advanced_cluster" "this" {
   }
 }
 
+# Two users, split by blast radius. The runtime user is what the MCP server (and
+# so every agent) connects as: readWrite on the workshop database and nothing
+# else, so a prompt-injected tool call cannot reach other databases or admin.
 resource "mongodbatlas_database_user" "agent" {
   count = local.atlas_count
 
@@ -75,8 +83,18 @@ resource "mongodbatlas_database_user" "agent" {
     role_name     = "readWrite"
     database_name = var.mongodb_db
   }
+}
 
-  # The seed script creates Atlas Search indexes, which needs more than readWrite.
+# The seed script creates Atlas Search indexes, which needs more than readWrite.
+# Only the EC2 box reads this user's secret, once, at first boot.
+resource "mongodbatlas_database_user" "seed" {
+  count = local.atlas_count
+
+  project_id         = mongodbatlas_project.this[0].id
+  username           = "${var.project_name}-seed"
+  password           = random_password.atlas_seed_user.result
+  auth_database_name = "admin"
+
   roles {
     role_name     = "atlasAdmin"
     database_name = "admin"
@@ -95,12 +113,14 @@ resource "mongodbatlas_project_ip_access_list" "public" {
 
 locals {
   # Inject credentials into the SRV string Atlas hands back. A bring-your-own URI
-  # already carries its own.
-  mongodb_uri = local.byo_atlas ? var.mongodb_uri : replace(
-    mongodbatlas_advanced_cluster.this[0].connection_strings[0].standard_srv,
-    "mongodb+srv://",
-    "mongodb+srv://${mongodbatlas_database_user.agent[0].username}:${random_password.atlas_user.result}@"
-  )
+  # already carries its own; see var.mongodb_uri / var.mongodb_seed_uri.
+  _srv = local.byo_atlas ? "" : mongodbatlas_advanced_cluster.this[0].connection_strings[0].standard_srv
+
+  mongodb_uri = local.byo_atlas ? var.mongodb_uri : replace(local._srv, "mongodb+srv://",
+  "mongodb+srv://${mongodbatlas_database_user.agent[0].username}:${random_password.atlas_user.result}@")
+
+  mongodb_seed_uri = local.byo_atlas ? (var.mongodb_seed_uri != "" ? var.mongodb_seed_uri : var.mongodb_uri) : replace(local._srv, "mongodb+srv://",
+  "mongodb+srv://${mongodbatlas_database_user.seed[0].username}:${random_password.atlas_seed_user.result}@")
 }
 
 # The URI carries a password, so it lives in Secrets Manager and is fetched at
@@ -108,11 +128,24 @@ locals {
 # runtime environment variables where GetAgentRuntime would expose it.
 resource "aws_secretsmanager_secret" "mongodb_uri" {
   name                    = "${var.project_name}/mongodb-uri"
-  description             = "Atlas connection string for the multi-agent workshop"
+  description             = "Atlas connection string (readWrite on the workshop db) for MCP and the UI"
   recovery_window_in_days = 0 # workshop stacks get destroyed and re-created often
 }
 
 resource "aws_secretsmanager_secret_version" "mongodb_uri" {
   secret_id     = aws_secretsmanager_secret.mongodb_uri.id
   secret_string = local.mongodb_uri
+}
+
+# Admin connection string for the seed script only. Readable by the EC2 role,
+# never by a runtime.
+resource "aws_secretsmanager_secret" "mongodb_seed_uri" {
+  name                    = "${var.project_name}/mongodb-seed-uri"
+  description             = "Atlas connection string with atlasAdmin, for seeding and index creation"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret_version" "mongodb_seed_uri" {
+  secret_id     = aws_secretsmanager_secret.mongodb_seed_uri.id
+  secret_string = local.mongodb_seed_uri
 }

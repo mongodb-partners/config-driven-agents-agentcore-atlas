@@ -13,8 +13,10 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     CONFIG_DIR=/app/config
 
-COPY agent/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# The lock pins every transitive dep with hashes (pip enforces them). Regenerate
+# with the command in its header after editing requirements.txt.
+COPY agent/requirements.lock .
+RUN pip install --no-cache-dir -r requirements.lock
 
 # ── Atlas Agent Engine Memory SDK, from the private registry ─────────────────
 # `agent-engine-sdk-memory` is not on PyPI. It is served from the Atlas Agent
@@ -24,7 +26,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Both arrive as BuildKit secrets — never build args, which are substituted into
 # the image history in plaintext. The client id is as sensitive as the secret:
 # it doubles as the runtime credential for the memory service (agentcore.tf
-# feeds both to the runtimes as AGENT_ENGINE_CLIENT_ID / AGENT_ENGINE_CLIENT_SECRET).
+# stores both in the app-credentials secret the runtimes load at startup).
 #
 # The fingerprint IS a build arg, and exists only to be one. BuildKit
 # deliberately keeps secret *contents* out of the cache key, so a build with
@@ -58,8 +60,9 @@ RUN --mount=type=secret,id=agent_engine_client_id \
       | jq -r .access_token); \
     [ -n "$ACCESS_TOKEN" ] && [ "$ACCESS_TOKEN" != "null" ] || \
       { echo "ERROR: Agent Engine token request failed — check agent_engine_client_id/secret." >&2; exit 1; }; \
-    pip install --no-cache-dir uv; \
+    pip install --no-cache-dir uv==0.11.26; \
     uv pip install --system "agent-engine-sdk-memory" \
+      --index-strategy first-index \
       --extra-index-url "https://ignore:${ACCESS_TOKEN}@agentengine.mongodb.com/api/v1/packages/python/simple"; \
     apt-get purge -y curl jq; apt-get autoremove -y; rm -rf /var/lib/apt/lists/*
 

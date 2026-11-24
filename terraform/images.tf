@@ -23,14 +23,22 @@ locals {
 
 resource "aws_ecr_repository" "agent" {
   name                 = "${var.project_name}/agent"
-  image_tag_mutability = "MUTABLE"
-  force_delete         = true # workshop stacks must destroy cleanly
+  image_tag_mutability = "MUTABLE" # build-and-push.sh re-pushes :latest, and the hash tag on a creds change
+  force_delete         = true      # workshop stacks must destroy cleanly
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
 }
 
 resource "aws_ecr_repository" "mcp" {
   name                 = "${var.project_name}/mongodb-mcp"
   image_tag_mutability = "MUTABLE"
   force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
 }
 
 resource "null_resource" "build_agent" {

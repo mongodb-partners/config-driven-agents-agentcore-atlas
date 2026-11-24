@@ -104,12 +104,16 @@ resource "aws_security_group" "ui" {
   description = "Streamlit UI"
   vpc_id      = data.aws_vpc.default.id
 
-  ingress {
-    description = "Streamlit"
-    from_port   = 8501
-    to_port     = 8501
-    protocol    = "tcp"
-    cidr_blocks = [var.ui_allowed_cidr]
+  # No CIDR, no ingress: the UI is then reachable only over SSM port forwarding.
+  dynamic "ingress" {
+    for_each = var.ui_allowed_cidr == "" ? [] : [var.ui_allowed_cidr]
+    content {
+      description = "Streamlit"
+      from_port   = 8501
+      to_port     = 8501
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+    }
   }
 
   egress {
@@ -147,15 +151,16 @@ resource "aws_instance" "ui" {
 
   user_data_replace_on_change = true
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
-    region                 = var.aws_region
-    bundle_uri             = "s3://${aws_s3_bucket.bundle.id}/${aws_s3_object.bundle.key}"
-    orchestrator_arn       = aws_bedrockagentcore_agent_runtime.agents[local.orchestrator_id].agent_runtime_arn
-    orchestrator_log_group = "/aws/bedrock-agentcore/runtimes/${aws_bedrockagentcore_agent_runtime.agents[local.orchestrator_id].agent_runtime_id}-DEFAULT"
-    mongodb_db             = var.mongodb_db
-    mongodb_secret_arn     = aws_secretsmanager_secret.mongodb_uri.arn
-    embedding_mode         = var.embedding_mode
-    voyage_api_key         = var.voyage_api_key
-    voyage_embed_model     = var.voyage_embed_model
+    region                  = var.aws_region
+    bundle_uri              = "s3://${aws_s3_bucket.bundle.id}/${aws_s3_object.bundle.key}"
+    orchestrator_arn        = aws_bedrockagentcore_agent_runtime.agents[local.orchestrator_id].agent_runtime_arn
+    orchestrator_log_group  = "/aws/bedrock-agentcore/runtimes/${aws_bedrockagentcore_agent_runtime.agents[local.orchestrator_id].agent_runtime_id}-DEFAULT"
+    mongodb_db              = var.mongodb_db
+    mongodb_secret_arn      = aws_secretsmanager_secret.mongodb_uri.arn
+    mongodb_seed_secret_arn = aws_secretsmanager_secret.mongodb_seed_uri.arn
+    app_secret_arn          = aws_secretsmanager_secret.app.arn
+    embedding_mode          = var.embedding_mode
+    voyage_embed_model      = var.voyage_embed_model
   })
 
   tags = { Name = "${var.project_name}-ui" }
@@ -163,6 +168,8 @@ resource "aws_instance" "ui" {
   depends_on = [
     aws_ssm_parameter.runtime_map,
     aws_iam_role_policy.ec2,
+    aws_secretsmanager_secret_version.mongodb_seed_uri,
+    aws_secretsmanager_secret_version.app,
     mongodbatlas_project_ip_access_list.public,
   ]
 }

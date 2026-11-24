@@ -135,8 +135,9 @@ mongodb_uri = "mongodb+srv://user:password@cluster.abcde.mongodb.net/"
 Deploy drops to 8–12 minutes, `atlas_org_id` and the Atlas API keys become
 unnecessary, and `destroy` leaves your cluster and its data alone. In exchange you
 own the parts Terraform was doing for you: network access reaching the AgentCore
-runtimes and the EC2 box, a user with `readWrite` on the database plus
-`atlasAdmin` on `admin` (the seed creates Search indexes), and a tier with room
+runtimes and the EC2 box, a user with `readWrite` on the database for the agents
+(`mongodb_uri`), an `atlasAdmin` user for the seed's Search indexes
+(`mongodb_seed_uri`, optional but recommended), and a tier with room
 for 7 vector indexes. `deploy.sh` prints that list before it starts, and
 [PRE_REQUISITES §3.0](PRE_REQUISITES.md#30-new-cluster-or-one-you-already-have)
 has the detail.
@@ -287,8 +288,10 @@ in both cases; only the long-term recall/persist path differs.
 The `engine` backend authenticates with an Atlas Agent Engine **service
 account** (see PRE_REQUISITES.md §2.6 for provisioning). Set
 `agent_engine_client_id`, `agent_engine_client_secret` and
-`agentic_memory_project_id` as Terraform variables; the first two reach the
-runtimes as `AGENT_ENGINE_CLIENT_ID` / `AGENT_ENGINE_CLIENT_SECRET`, and an
+`agentic_memory_project_id` as Terraform variables; the first two are stored in
+the `<project_name>/app-credentials` secret (never in runtime environment
+variables), loaded into `AGENT_ENGINE_CLIENT_ID` / `AGENT_ENGINE_CLIENT_SECRET`
+when the runtime starts, and an
 `engine` agent raises on its first turn if they are missing.
 
 The same service account does two jobs. At build time it mints a token so the
@@ -484,10 +487,14 @@ sudo tail -f /var/log/riv-seed.log        # seeding and index builds
 sudo tail -f /var/log/riv-ui.log          # Streamlit
 sudo systemctl restart riv-ui
 
-# re-seed by hand
+# re-seed by hand (the seed URI is the atlasAdmin one; the UI/agents' is not enough)
 sudo -i
+set -a; . /etc/riv-workshop.env; set +a
 export MONGODB_URI="$(aws secretsmanager get-secret-value \
-  --secret-id <secret-arn> --query SecretString --output text)"
+  --secret-id <project_name>/mongodb-seed-uri --query SecretString --output text)"
+export VOYAGE_API_KEY="$(aws secretsmanager get-secret-value \
+  --secret-id <project_name>/app-credentials --query SecretString --output text \
+  | python3.11 -c 'import json,sys; print(json.load(sys.stdin)["VOYAGE_API_KEY"])')"
 /opt/riv/venv/bin/python /opt/riv/seed/seed.py
 ```
 
@@ -525,9 +532,10 @@ db.agent_traces.aggregate([
 
 Deliberate, and marked `ponytail:` in the source where they are load-bearing.
 
-- **The UI has no authentication.** Cognito was explicitly out of scope. `ui_allowed_cidr`
-  is the only control — narrow it to your own IP if your network allows. Do not
-  leave this stack running unattended.
+- **The UI has no authentication.** Cognito was explicitly out of scope. The security
+  group is the only control: `deploy.sh` opens port 8501 to the deployer's IP/32,
+  `ui_allowed_cidr = ""` opens nothing (use the `ui_port_forward_command` output),
+  and `0.0.0.0/0` is rejected. Do not leave this stack running unattended.
 - **All traffic is over the public internet.** No VPC peering or PrivateLink, and
   the Atlas project accepts `0.0.0.0/0`. That is a simplification, not a
   pattern to copy into production.
